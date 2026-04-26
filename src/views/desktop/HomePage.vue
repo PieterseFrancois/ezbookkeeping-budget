@@ -181,6 +181,10 @@
                                              :loading="loadingOverview" :disabled="loadingOverview"
                                              :enable-click-item="true" @click="clickMonthlyIncomeOrExpense" />
         </v-col>
+
+        <v-col cols="12">
+            <budget-overview-card :loading="loadingOverview" :budget-summary="budgetSummary" :unbudgeted="unbudgeted"/>
+        </v-col>
     </v-row>
 
     <snack-bar ref="snackbar" />
@@ -190,6 +194,7 @@
 import SnackBar from '@/components/desktop/SnackBar.vue';
 import IncomeExpenseOverviewCard from './overview/cards/IncomeExpenseOverviewCard.vue';
 import MonthlyIncomeAndExpenseCard, { type MonthlyIncomeAndExpenseCardClickEvent } from './overview/cards/MonthlyIncomeAndExpenseCard.vue';
+import BudgetOverviewCard, { type BudgetSummaryItem, type UnbudgetedItem } from './overview/cards/BudgetOverviewCard.vue';
 
 import { ref, computed, useTemplateRef } from 'vue';
 import { useRouter } from 'vue-router';
@@ -203,13 +208,17 @@ import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useOverviewStore } from '@/stores/overview.ts';
 
 import { DateRange } from '@/core/datetime.ts';
+import { CategoryType } from '@/core/category.ts';
 import { ThemeType } from '@/core/theme.ts';
 import {
     type TransactionMonthlyIncomeAndExpenseData,
     LATEST_12MONTHS_TRANSACTION_AMOUNTS_REQUEST_TYPES
 } from '@/models/transaction.ts';
 
-import { getUnixTimeBeforeUnixTime, getUnixTimeAfterUnixTime } from '@/lib/datetime.ts';
+import { getUnixTimeBeforeUnixTime, getUnixTimeAfterUnixTime, getThisMonthFirstUnixTime, getThisMonthLastUnixTime } from '@/lib/datetime.ts';
+import axios from 'axios';
+import type { ApiResponse } from '@/core/api.ts';
+import services from '@/lib/services.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 
 import {
@@ -251,6 +260,16 @@ const overviewStore = useOverviewStore();
 const snackbar = useTemplateRef<SnackBarType>('snackbar');
 
 const loadingOverview = ref<boolean>(true);
+const budgetSummary = ref<BudgetSummaryItem[]>([]);
+const unbudgeted = ref<UnbudgetedItem[]>([]);
+
+interface BudgetTargetRawItem {
+    id: string;
+    categoryId: string;
+    year: number;
+    month: number;
+    amount: string;
+}
 
 const isDarkMode = computed<boolean>(() => theme.global.name.value === ThemeType.Dark);
 
@@ -297,12 +316,92 @@ const monthlyIncomeAndExpenseData = computed<TransactionMonthlyIncomeAndExpenseD
     return data;
 });
 
+async function loadBudgetOverview(): Promise<void> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const startTime = getThisMonthFirstUnixTime();
+    const endTime = getThisMonthLastUnixTime();
+
+    const [budgetResp, statsResp] = await Promise.all([
+        axios.get<ApiResponse<BudgetTargetRawItem[]>>(`v1/budget/targets.json?year=${year}&month=${month}`),
+        services.getTransactionStatistics({ startTime, endTime, tagFilter: '', keyword: '', useTransactionTimezone: false })
+    ]);
+
+    const targets = budgetResp.data?.result ?? [];
+    const statsItems = statsResp.data?.result?.items ?? [];
+
+    // subcategoryId -> amount spent this month (expense categories only)
+    const spentBySubcategoryId: Record<string, number> = {};
+    for (const item of statsItems) {
+        const cat = transactionCategoriesStore.allTransactionCategoriesMap[item.categoryId];
+        if (cat && cat.type === CategoryType.Expense) {
+            spentBySubcategoryId[item.categoryId] = (spentBySubcategoryId[item.categoryId] ?? 0) + item.amount;
+        }
+    }
+
+    // subcategoryId -> budgeted amount
+    const budgetedSubcategoryIds = new Set<string>();
+    for (const target of targets) {
+        budgetedSubcategoryIds.add(target.categoryId);
+    }
+
+    // Group budget targets by parent category; only parents with ≥1 budgeted subcategory are included
+    const parentGroups: Record<string, { name: string; totalBudgeted: number; totalSpent: number }> = {};
+
+    for (const target of targets) {
+        const subCat = transactionCategoriesStore.allTransactionCategoriesMap[target.categoryId];
+        if (!subCat || !subCat.parentId || subCat.parentId === '0') continue;
+
+        const parentId = subCat.parentId;
+        const parentCat = transactionCategoriesStore.allTransactionCategoriesMap[parentId];
+        if (!parentCat) continue;
+
+        const group = parentGroups[parentId] ?? (parentGroups[parentId] = { name: parentCat.name, totalBudgeted: 0, totalSpent: 0 });
+        group.totalBudgeted += Number(target.amount);
+    }
+
+    // Sum spending across ALL subcategories of each budgeted parent (not just the budgeted subs)
+    for (const [parentId, group] of Object.entries(parentGroups)) {
+        const parentCat = transactionCategoriesStore.allTransactionCategoriesMap[parentId];
+        for (const subCat of parentCat?.subCategories ?? []) {
+            group.totalSpent += spentBySubcategoryId[subCat.id] ?? 0;
+        }
+    }
+
+    const summary: BudgetSummaryItem[] = Object.values(parentGroups).map(g => ({
+        categoryName: g.name,
+        budgeted: g.totalBudgeted,
+        spent: g.totalSpent,
+        remaining: g.totalBudgeted - g.totalSpent
+    }));
+
+    // Subcategories with spending but no budget target → unbudgeted list
+    const unbudgetedList: UnbudgetedItem[] = [];
+    for (const [subcatId, spent] of Object.entries(spentBySubcategoryId)) {
+        if (spent <= 0 || budgetedSubcategoryIds.has(subcatId)) continue;
+
+        const subCat = transactionCategoriesStore.allTransactionCategoriesMap[subcatId];
+        if (!subCat) continue;
+
+        const parentCat = subCat.parentId && subCat.parentId !== '0'
+            ? transactionCategoriesStore.allTransactionCategoriesMap[subCat.parentId]
+            : undefined;
+
+        const categoryName = parentCat ? `${parentCat.name} > ${subCat.name}` : subCat.name;
+        unbudgetedList.push({ categoryName, spent });
+    }
+
+    budgetSummary.value = summary;
+    unbudgeted.value = unbudgetedList;
+}
+
 function reload(force: boolean): void {
     loadingOverview.value = true;
 
     const promises = [
         accountsStore.loadAllAccounts({ force: false }),
-        transactionCategoriesStore.loadAllCategories({ force: false }),
+        transactionCategoriesStore.loadAllCategories({ force: false }).then(() => loadBudgetOverview()),
         overviewStore.loadTransactionOverview({ force: force, loadLast11Months: true })
     ];
 

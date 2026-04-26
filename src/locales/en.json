@@ -2661,5 +2661,11 @@
     "An error occurred": "An error occurred",
     "Parameter Invalid": "Parameter Invalid",
     "Numeric Overflow": "Numeric Overflow",
-    "Click to close": "Click to close"
+    "Click to close": "Click to close",
+    "Budget Overview": "Budget Overview",
+    "Budgeted": "Budgeted",
+    "Spent": "Spent",
+    "Remaining": "Remaining",
+    "Unbudgeted Categories": "Unbudgeted Categories",
+    "No budget targets for this month": "No budget targets for this month"
 }
