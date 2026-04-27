@@ -163,6 +163,8 @@
             </f7-list-item>
         </f7-list>
 
+        <budget-overview-card :loading="loadingBudget" :budget-summary="budgetSummary" :unbudgeted="unbudgeted" />
+
         <f7-toolbar tabbar icons bottom class="main-tabbar">
             <f7-link class="link" href="/transaction/list">
                 <f7-icon f7="square_list"></f7-icon>
@@ -214,9 +216,11 @@
 
 <script setup lang="ts">
 import AIImageRecognitionSheet from '@/components/mobile/AIImageRecognitionSheet.vue';
+import BudgetOverviewCard, { type BudgetSummaryItem, type UnbudgetedItem } from '@/views/mobile/budget/BudgetOverviewCard.vue';
 
 import { ref, computed, useTemplateRef } from 'vue';
 import type { Router } from 'framework7/types';
+import axios from 'axios';
 
 import { useI18n } from '@/locales/helpers.ts';
 import { useI18nUIComponents } from '@/lib/ui/mobile.ts';
@@ -228,12 +232,16 @@ import { useTransactionTemplatesStore } from '@/stores/transactionTemplate.ts';
 import { useOverviewStore } from '@/stores/overview.ts';
 
 import { DateRange } from '@/core/datetime.ts';
+import { CategoryType } from '@/core/category.ts';
 import { TemplateType } from '@/core/template.ts';
 import { TransactionTemplate } from '@/models/transaction_template.ts';
 import type { RecognizedReceiptImageResponse } from '@/models/large_language_model.ts';
+import type { ApiResponse } from '@/core/api.ts';
+import services from '@/lib/services.ts';
 
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 import { getShareCacheImageBlob } from '@/lib/cache.ts';
+import { getThisMonthFirstUnixTime, getThisMonthLastUnixTime } from '@/lib/datetime.ts';
 import { isTransactionFromAIImageRecognitionEnabled } from '@/lib/server_settings.ts';
 
 type AIImageRecognitionSheetType = InstanceType<typeof AIImageRecognitionSheet>;
@@ -261,8 +269,91 @@ const overviewStore = useOverviewStore();
 const aiImageRecognitionSheet = useTemplateRef<AIImageRecognitionSheetType>('aiImageRecognitionSheet');
 
 const loading = ref<boolean>(true);
+const loadingBudget = ref<boolean>(true);
 const showTransactionTemplatePopover = ref<boolean>(false);
 const showAIReceiptImageRecognitionSheet = ref<boolean>(false);
+
+const budgetSummary = ref<BudgetSummaryItem[]>([]);
+const unbudgeted = ref<UnbudgetedItem[]>([]);
+
+interface BudgetTargetRawItem {
+    id: string;
+    categoryId: string;
+    year: number;
+    month: number;
+    amount: string;
+}
+
+async function loadBudgetOverview(): Promise<void> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const startTime = getThisMonthFirstUnixTime();
+    const endTime = getThisMonthLastUnixTime();
+
+    const [budgetResp, statsResp] = await Promise.all([
+        axios.get<ApiResponse<BudgetTargetRawItem[]>>(`v1/budget/targets.json?year=${year}&month=${month}`),
+        services.getTransactionStatistics({ startTime, endTime, tagFilter: '', keyword: '', useTransactionTimezone: false })
+    ]);
+
+    const targets = budgetResp.data?.result ?? [];
+    const statsItems = statsResp.data?.result?.items ?? [];
+
+    const spentBySubcategoryId: Record<string, number> = {};
+    for (const item of statsItems) {
+        const cat = transactionCategoriesStore.allTransactionCategoriesMap[item.categoryId];
+        if (cat && cat.type === CategoryType.Expense) {
+            spentBySubcategoryId[item.categoryId] = (spentBySubcategoryId[item.categoryId] ?? 0) + item.amount;
+        }
+    }
+
+    const budgetedSubcategoryIds = new Set<string>();
+    for (const target of targets) {
+        budgetedSubcategoryIds.add(target.categoryId);
+    }
+
+    const parentGroups: Record<string, { name: string; icon: string; color: string; totalBudgeted: number; totalSpent: number }> = {};
+    for (const target of targets) {
+        const subCat = transactionCategoriesStore.allTransactionCategoriesMap[target.categoryId];
+        if (!subCat || !subCat.parentId || subCat.parentId === '0') continue;
+
+        const parentId = subCat.parentId;
+        const parentCat = transactionCategoriesStore.allTransactionCategoriesMap[parentId];
+        if (!parentCat || parentCat.type !== CategoryType.Expense) continue;
+
+        const group = parentGroups[parentId] ?? (parentGroups[parentId] = { name: parentCat.name, icon: parentCat.icon, color: parentCat.color, totalBudgeted: 0, totalSpent: 0 });
+        group.totalBudgeted += Number(target.amount);
+    }
+
+    for (const [parentId, group] of Object.entries(parentGroups)) {
+        const parentCat = transactionCategoriesStore.allTransactionCategoriesMap[parentId];
+        for (const subCat of parentCat?.subCategories ?? []) {
+            group.totalSpent += spentBySubcategoryId[subCat.id] ?? 0;
+        }
+    }
+
+    budgetSummary.value = Object.values(parentGroups).map(g => ({
+        categoryName: g.name,
+        icon: g.icon,
+        color: g.color,
+        budgeted: g.totalBudgeted,
+        spent: g.totalSpent,
+        remaining: g.totalBudgeted - g.totalSpent
+    }));
+
+    const unbudgetedList: UnbudgetedItem[] = [];
+    for (const [subcatId, spent] of Object.entries(spentBySubcategoryId)) {
+        if (spent <= 0 || budgetedSubcategoryIds.has(subcatId)) continue;
+        const subCat = transactionCategoriesStore.allTransactionCategoriesMap[subcatId];
+        if (!subCat) continue;
+        const parentCat = subCat.parentId && subCat.parentId !== '0'
+            ? transactionCategoriesStore.allTransactionCategoriesMap[subCat.parentId]
+            : undefined;
+        const iconSource = parentCat ?? subCat;
+        unbudgetedList.push({ categoryName: parentCat ? `${parentCat.name} > ${subCat.name}` : subCat.name, icon: iconSource.icon, color: iconSource.color, spent });
+    }
+    unbudgeted.value = unbudgetedList;
+}
 
 const allTransactionTemplates = computed<TransactionTemplate[]>(() => {
     const allTemplates = transactionTemplatesStore.allVisibleTemplates;
@@ -282,7 +373,7 @@ function init(): void {
         const promises = [
             getShareCacheImageBlob(),
             accountsStore.loadAllAccounts({ force: false }),
-            transactionCategoriesStore.loadAllCategories({ force: false }),
+            transactionCategoriesStore.loadAllCategories({ force: false }).then(() => loadBudgetOverview().finally(() => { loadingBudget.value = false; })),
             transactionTemplatesStore.loadAllTemplates({ templateType: TemplateType.Normal.type,  force: false }),
             overviewStore.loadTransactionOverview({ force: false })
         ];

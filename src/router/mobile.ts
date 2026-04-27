@@ -49,6 +49,8 @@ import TagGroupListPage from '@/views/mobile/tags/GroupListPage.vue';
 
 import TemplateListPage from '@/views/mobile/templates/ListPage.vue';
 
+import BudgetPage from '@/views/mobile/budget/BudgetPage.vue';
+
 function asyncResolve(component: unknown): (ctx: Router.RouteCallbackCtx) => void {
     return function({ resolve }: { resolve: ({ component }: { component: unknown }) => void }): void {
         return resolve({
@@ -334,6 +336,11 @@ const routes: Router.RouteParameters[] = [
     {
         path: '/tag/group/list',
         async: asyncResolve(TagGroupListPage),
+        beforeEnter: [checkLogin]
+    },
+    {
+        path: '/budget',
+        async: asyncResolve(BudgetPage),
         beforeEnter: [checkLogin]
     },
     {
