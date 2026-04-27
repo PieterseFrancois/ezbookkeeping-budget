@@ -93,7 +93,9 @@ function displayAmount(amount: number): string {
     if (!showAmountInHomePage.value) {
         return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value);
     }
-    return formatAmountToLocalizedNumeralsWithCurrency(amount, defaultCurrency.value);
+    const rands = Math.round(amount / 100) * 100;
+    return formatAmountToLocalizedNumeralsWithCurrency(rands, defaultCurrency.value)
+        .replace(/[,.]00$/, '');
 }
 </script>
 

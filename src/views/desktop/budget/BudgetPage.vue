@@ -758,7 +758,9 @@ function isSelectedMonth(m: { year: number; month: number }): boolean {
 }
 
 function fmt(amount: number): string {
-    return formatAmountToLocalizedNumeralsWithCurrency(amount, defaultCurrency.value);
+    const rands = Math.round(amount / 100) * 100;
+    return formatAmountToLocalizedNumeralsWithCurrency(rands, defaultCurrency.value)
+        .replace(/[,.]00$/, '');
 }
 
 function diffClass(diff: number): string {
