@@ -21,6 +21,12 @@
                         <span class="nav-item-title">{{ tt('Overview') }}</span>
                     </router-link>
                 </li>
+                <li class="nav-link">
+                    <router-link to="/budget">
+                        <v-icon class="nav-item-icon" :icon="mdiWalletOutline"/>
+                        <span class="nav-item-title">{{ tt('Budget') }}</span>
+                    </router-link>
+                </li>
                 <li class="nav-section-title">
                     <div class="title-wrapper">
                         <span class="title-text">{{ tt('Transaction Data') }}</span>
@@ -229,6 +235,7 @@ import logger from '@/lib/logger.ts';
 import {
     mdiMenu,
     mdiHomeOutline,
+    mdiWalletOutline,
     mdiListBoxOutline,
     mdiPlusCircle,
     mdiCreditCardOutline,
