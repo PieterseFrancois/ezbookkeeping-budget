@@ -1085,7 +1085,7 @@ function colNetActual(col: { year: number; month: number }): number {
 }
 
 function colNetDiff(col: { year: number; month: number }): number {
-    return colNetBudgeted(col) - colNetActual(col);
+    return colNetActual(col) - colNetBudgeted(col);
 }
 
 // ---------- Expand/collapse ----------

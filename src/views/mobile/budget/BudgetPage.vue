@@ -819,7 +819,7 @@ const colSavingsDiff = computed<number>(() => colSavingsBudgeted.value - colSavi
 
 const colNetBudgeted = computed<number>(() => colIncomeBudgeted.value - colExpenseBudgeted.value - colSavingsBudgeted.value);
 const colNetActual = computed<number>(() => colIncomeActual.value - colExpenseActual.value - colSavingsActual.value);
-const colNetDiff = computed<number>(() => colNetBudgeted.value - colNetActual.value);
+const colNetDiff = computed<number>(() => colNetActual.value - colNetBudgeted.value);
 
 // ---------- Expand/collapse ----------
 
