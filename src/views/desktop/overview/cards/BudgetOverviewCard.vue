@@ -36,7 +36,7 @@
                     <span class="budget-amount-col text-end text-body-2">{{ displayAmount(item.budgeted) }}</span>
                     <span class="budget-amount-col text-end text-body-2">{{ displayAmount(item.spent) }}</span>
                     <span class="budget-amount-col text-end text-body-2"
-                          :class="item.remaining < 0 ? 'text-error' : 'text-success'">{{ displayAmount(item.remaining) }}</span>
+                          :class="item.isSavings ? (item.remaining > 0 ? 'text-error' : item.remaining < 0 ? 'text-success' : '') : (item.remaining < 0 ? 'text-error' : 'text-success')">{{ displayAmount(item.remaining) }}</span>
                 </div>
                 <v-progress-linear
                     :model-value="progressValue(item)"
@@ -87,6 +87,7 @@ export interface BudgetSummaryItem {
     budgeted: number;
     spent: number;
     remaining: number;
+    isSavings?: boolean;
 }
 
 export interface UnbudgetedItem {
@@ -127,6 +128,13 @@ function progressValue(item: BudgetSummaryItem): number {
 }
 
 function progressColor(item: BudgetSummaryItem): string {
+    if (item.isSavings) {
+        if (item.budgeted <= 0) return item.spent > 0 ? 'success' : 'error';
+        const pct = item.spent / item.budgeted;
+        if (pct >= 1) return 'success';
+        if (pct >= 0.8) return 'warning';
+        return 'error';
+    }
     if (item.budgeted <= 0) return item.spent > 0 ? 'error' : 'success';
     const pct = item.spent / item.budgeted;
     if (pct >= 1) return 'error';

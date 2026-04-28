@@ -2690,5 +2690,9 @@
     "Source Amount": "Source Amount",
     "Destination Amount": "Destination Amount",
     "This category is hidden in the destination month.": "This category is hidden in the destination month.",
-    "This category already has a budget in the destination month.": "This category already has a budget in the destination month."
+    "This category already has a budget in the destination month.": "This category already has a budget in the destination month.",
+    "Savings": "Savings",
+    "Savings & Investments": "Savings & Investments",
+    "Net Contribution": "Net Contribution",
+    "Withdrawal": "Withdrawal"
 }

@@ -284,6 +284,13 @@ interface BudgetTargetRawItem {
     amount: string;
 }
 
+interface SavingsActualRawItem {
+    categoryId: string;
+    transferOut: string;
+    transferIn: string;
+    net: string;
+}
+
 async function loadBudgetOverview(): Promise<void> {
     const now = new Date();
     const year = now.getFullYear();
@@ -291,13 +298,15 @@ async function loadBudgetOverview(): Promise<void> {
     const startTime = getThisMonthFirstUnixTime();
     const endTime = getThisMonthLastUnixTime();
 
-    const [budgetResp, statsResp] = await Promise.all([
+    const [budgetResp, statsResp, savingsResp] = await Promise.all([
         axios.get<ApiResponse<BudgetTargetRawItem[]>>(`v1/budget/targets.json?year=${year}&month=${month}`),
-        services.getTransactionStatistics({ startTime, endTime, tagFilter: '', keyword: '', useTransactionTimezone: false })
+        services.getTransactionStatistics({ startTime, endTime, tagFilter: '', keyword: '', useTransactionTimezone: false }),
+        axios.get<ApiResponse<{ items: SavingsActualRawItem[] }>>(`v1/budget/savings-actuals.json?year=${year}&month=${month}`)
     ]);
 
     const targets = budgetResp.data?.result ?? [];
     const statsItems = statsResp.data?.result?.items ?? [];
+    const savingsItems = savingsResp.data?.result?.items ?? [];
 
     const spentBySubcategoryId: Record<string, number> = {};
     for (const item of statsItems) {
@@ -307,28 +316,36 @@ async function loadBudgetOverview(): Promise<void> {
         }
     }
 
+    const savingsNetBySubId: Record<string, number> = {};
+    for (const item of savingsItems) {
+        savingsNetBySubId[item.categoryId] = Number(item.net);
+    }
+
     const budgetedSubcategoryIds = new Set<string>();
     for (const target of targets) {
         budgetedSubcategoryIds.add(target.categoryId);
     }
 
-    const parentGroups: Record<string, { name: string; icon: string; color: string; totalBudgeted: number; totalSpent: number }> = {};
+    const parentGroups: Record<string, { name: string; icon: string; color: string; isSavings: boolean; totalBudgeted: number; totalSpent: number }> = {};
     for (const target of targets) {
         const subCat = transactionCategoriesStore.allTransactionCategoriesMap[target.categoryId];
         if (!subCat || !subCat.parentId || subCat.parentId === '0') continue;
 
         const parentId = subCat.parentId;
         const parentCat = transactionCategoriesStore.allTransactionCategoriesMap[parentId];
-        if (!parentCat || parentCat.type !== CategoryType.Expense) continue;
+        if (!parentCat) continue;
 
-        const group = parentGroups[parentId] ?? (parentGroups[parentId] = { name: parentCat.name, icon: parentCat.icon, color: parentCat.color, totalBudgeted: 0, totalSpent: 0 });
+        const group = parentGroups[parentId] ?? (parentGroups[parentId] = { name: parentCat.name, icon: parentCat.icon, color: parentCat.color, isSavings: parentCat.type === CategoryType.Transfer, totalBudgeted: 0, totalSpent: 0 });
         group.totalBudgeted += Number(target.amount);
     }
 
     for (const [parentId, group] of Object.entries(parentGroups)) {
         const parentCat = transactionCategoriesStore.allTransactionCategoriesMap[parentId];
+        const isTransfer = parentCat?.type === CategoryType.Transfer;
         for (const subCat of parentCat?.subCategories ?? []) {
-            group.totalSpent += spentBySubcategoryId[subCat.id] ?? 0;
+            group.totalSpent += isTransfer
+                ? (savingsNetBySubId[subCat.id] ?? 0)
+                : (spentBySubcategoryId[subCat.id] ?? 0);
         }
     }
 
@@ -338,7 +355,8 @@ async function loadBudgetOverview(): Promise<void> {
         color: g.color,
         budgeted: g.totalBudgeted,
         spent: g.totalSpent,
-        remaining: g.totalBudgeted - g.totalSpent
+        remaining: g.totalBudgeted - g.totalSpent,
+        isSavings: g.isSavings,
     }));
 
     const unbudgetedList: UnbudgetedItem[] = [];

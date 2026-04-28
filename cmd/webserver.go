@@ -466,6 +466,7 @@ func startWebServer(c *core.CliContext) error {
 			apiV1Route.POST("/budget/targets/add.json", bindApi(api.Budget.CreateBudgetTargetHandler))
 			apiV1Route.POST("/budget/targets/modify.json", bindApi(api.Budget.UpdateBudgetTargetHandler))
 			apiV1Route.POST("/budget/targets/delete.json", bindApi(api.Budget.DeleteBudgetTargetHandler))
+			apiV1Route.GET("/budget/savings-actuals.json", bindApi(api.Budget.SavingsActualsHandler))
 
 			// Large Language Models
 			if config.ReceiptImageRecognitionLLMConfig != nil && config.ReceiptImageRecognitionLLMConfig.LLMProvider != "" {

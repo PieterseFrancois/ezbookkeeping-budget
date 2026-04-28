@@ -24,6 +24,13 @@ export interface CopyDecision {
     action: 'copy' | 'copy_unhide' | 'overwrite' | 'overwrite_unhide' | 'skip';
 }
 
+export interface SavingsCategoryActual {
+    categoryId: string;
+    transferOut: string;
+    transferIn: string;
+    net: string;
+}
+
 function loadHiddenIds(): string[] {
     try {
         const raw = localStorage.getItem(HIDDEN_CATEGORIES_KEY);
@@ -49,6 +56,8 @@ export function useBudgetPageBase() {
     const hiddenCategoryIds = ref<Set<string>>(new Set(loadHiddenIds()));
     // budgetTargets: outer key = `${year}-${month}`, inner key = subcategory id
     const budgetTargets = ref<Record<string, Record<string, BudgetTargetEntry>>>({});
+    // savingsActuals: outer key = `${year}-${month}`, inner key = categoryId string
+    const savingsActuals = ref<Record<string, Record<string, SavingsCategoryActual>>>({});
 
     const threeMonthColumns = computed<{ year: number; month: number }[]>(() => [
         addMonths(selectedYear.value, selectedMonth.value, -1),
@@ -71,6 +80,23 @@ export function useBudgetPageBase() {
             monthMap[t.categoryId] = { id: t.id, amount: Number(t.amount) };
         }
         budgetTargets.value[`${year}-${month}`] = monthMap;
+    }
+
+    async function loadSavingsActuals(year: number, month: number): Promise<void> {
+        const resp = await axios.get<ApiResponse<{ items: SavingsCategoryActual[] }>>(
+            `v1/budget/savings-actuals.json?year=${year}&month=${month}`
+        );
+        const items = resp.data?.result?.items ?? [];
+        const monthMap: Record<string, SavingsCategoryActual> = {};
+        for (const item of items) {
+            monthMap[item.categoryId] = item;
+        }
+        savingsActuals.value[`${year}-${month}`] = monthMap;
+    }
+
+    function getSavingsNet(categoryId: string, year: number, month: number): number {
+        const entry = savingsActuals.value[`${year}-${month}`]?.[categoryId];
+        return entry ? Number(entry.net) : 0;
     }
 
     async function saveBudgetTarget(
@@ -185,9 +211,12 @@ export function useBudgetPageBase() {
         selectedMonth,
         hiddenCategoryIds,
         budgetTargets,
+        savingsActuals,
         threeMonthColumns,
         selectMonth,
         loadBudgetTargets,
+        loadSavingsActuals,
+        getSavingsNet,
         saveBudgetTarget,
         deleteBudgetTarget,
         copyBudgetFromMonth,

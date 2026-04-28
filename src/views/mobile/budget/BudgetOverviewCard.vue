@@ -32,7 +32,7 @@
                     <span class="budget-ov-amt-cell">{{ displayAmount(item.budgeted) }}</span>
                     <span
                         class="budget-ov-amt-cell budget-ov-remaining"
-                        :class="item.remaining < 0 ? 'text-color-red' : 'text-color-green'"
+                        :class="item.isSavings ? (item.remaining > 0 ? 'text-color-red' : item.remaining < 0 ? 'text-color-green' : '') : (item.remaining < 0 ? 'text-color-red' : 'text-color-green')"
                     >{{ displayAmount(item.remaining) }}</span>
                 </div>
 
@@ -75,6 +75,7 @@ export interface BudgetSummaryItem {
     budgeted: number;
     spent: number;
     remaining: number;
+    isSavings?: boolean;
 }
 
 export interface UnbudgetedItem {

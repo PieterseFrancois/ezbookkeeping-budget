@@ -52,6 +52,16 @@
                     <span class="budget-m-amt-cell">{{ fmt(colIncomeActual) }}</span>
                     <span class="budget-m-amt-cell" :class="diffClass(colIncomeDiff)">{{ fmt(colIncomeDiff) }}</span>
                 </div>
+                <!-- Savings row -->
+                <div class="budget-m-row budget-m-summary-row" @click="showSavingsSection = !showSavingsSection">
+                    <div class="budget-m-name-cell budget-m-summary-name">
+                        <f7-icon :f7="showSavingsSection ? 'chevron_down' : 'chevron_right'" size="14" class="budget-m-chevron" />
+                        <span>{{ tt('Savings') }}</span>
+                    </div>
+                    <span class="budget-m-amt-cell">{{ fmt(colSavingsBudgeted) }}</span>
+                    <span class="budget-m-amt-cell">{{ fmt(colSavingsActual) }}</span>
+                    <span class="budget-m-amt-cell" :class="savingsDiffClass(colSavingsDiff)">{{ fmt(colSavingsDiff) }}</span>
+                </div>
                 <!-- Net row -->
                 <div class="budget-m-row">
                     <div class="budget-m-name-cell budget-m-net-name">{{ tt('Net') }}</div>
@@ -173,6 +183,59 @@
                                     <div class="budget-m-eye-cell">
                                         <f7-link
                                             v-if="!hiddenCategoryIds.has(sub.id) && subBudgeted(sub.id) === 0"
+                                            class="budget-m-eye-btn"
+                                            @click.stop="onHideSub(sub.id)"
+                                        >
+                                            <f7-icon f7="eye_slash" size="18" />
+                                        </f7-link>
+                                    </div>
+                                </div>
+                            </template>
+                        </template>
+                    </template>
+                </template>
+            </template>
+
+            <div v-if="(showExpenseSection || showIncomeSection) && showSavingsSection" class="budget-m-section-divider" />
+
+            <!-- Savings section -->
+            <template v-if="showSavingsSection">
+                <div class="budget-m-section-label">{{ tt('Savings') }}</div>
+                <template v-for="parent in allTransferParents" :key="parent.id">
+                    <template v-if="isSavingsParentVisible(parent)">
+                        <div class="budget-m-row budget-m-parent-row" @click="toggleExpanded(parent.id)">
+                            <div class="budget-m-name-cell budget-m-parent-name">
+                                <f7-icon :f7="expandedParents.has(parent.id) ? 'chevron_down' : 'chevron_right'" size="14" class="budget-m-chevron" />
+                                <span class="budget-m-parent-label">{{ parent.name }}</span>
+                            </div>
+                            <span class="budget-m-amt-cell">{{ fmt(parentSavingsBudgeted(parent)) }}</span>
+                            <span class="budget-m-amt-cell">{{ fmt(parentSavingsActual(parent)) }}</span>
+                            <span class="budget-m-amt-cell" :class="savingsDiffClass(parentSavingsRemaining(parent))">{{ fmt(parentSavingsRemaining(parent)) }}</span>
+                            <div class="budget-m-eye-cell">
+                                <f7-link
+                                    v-if="!hiddenCategoryIds.has(parent.id) && parentSavingsBudgeted(parent) === 0"
+                                    class="budget-m-eye-btn"
+                                    @click.stop="onHideParent(parent)"
+                                >
+                                    <f7-icon f7="eye_slash" size="18" />
+                                </f7-link>
+                            </div>
+                        </div>
+                        <template v-if="expandedParents.has(parent.id)">
+                            <template v-for="sub in (parent.subCategories ?? [])" :key="sub.id">
+                                <div
+                                    v-if="isSavingsSubVisible(sub.id)"
+                                    class="budget-m-row budget-m-sub-row"
+                                >
+                                    <span class="budget-m-name-cell budget-m-sub-name">{{ sub.name }}</span>
+                                    <div class="budget-m-amt-cell budget-m-budgeted-cell" @click="startEdit(sub.id, sub.name)">
+                                        <span :class="{ 'budget-m-zero': subSavingsBudgeted(sub.id) === 0 }">{{ fmt(subSavingsBudgeted(sub.id)) }}</span>
+                                    </div>
+                                    <span class="budget-m-amt-cell">{{ fmt(subSavingsActual(sub.id)) }}</span>
+                                    <span class="budget-m-amt-cell" :class="savingsDiffClass(subSavingsRemaining(sub.id))">{{ fmt(subSavingsRemaining(sub.id)) }}</span>
+                                    <div class="budget-m-eye-cell">
+                                        <f7-link
+                                            v-if="!hiddenCategoryIds.has(sub.id) && subSavingsBudgeted(sub.id) === 0"
                                             class="budget-m-eye-btn"
                                             @click.stop="onHideSub(sub.id)"
                                         >
@@ -376,6 +439,26 @@
                     >
                         <template #media><f7-icon f7="plus_circle" /></template>
                     </f7-list-item>
+                    <f7-list-item
+                        v-for="parent in hiddenSavingsParents"
+                        :key="'sp-' + parent.id"
+                        link="#" no-chevron
+                        :title="parent.name"
+                        :footer="tt('Savings')"
+                        @click="onAddParent(parent)"
+                    >
+                        <template #media><f7-icon f7="plus_circle" /></template>
+                    </f7-list-item>
+                    <f7-list-item
+                        v-for="item in hiddenSavingsSubsUnderVisibleParent"
+                        :key="'ss-' + item.sub.id"
+                        link="#" no-chevron
+                        :title="item.sub.name"
+                        :footer="item.parent.name + ' · ' + tt('Savings')"
+                        @click="onAddSub(item.sub.id)"
+                    >
+                        <template #media><f7-icon f7="plus_circle" /></template>
+                    </f7-list-item>
                 </f7-list>
                 <f7-block v-else>
                     <p>{{ tt('No categories available to add') }}</p>
@@ -416,8 +499,11 @@ const {
     selectedMonth,
     hiddenCategoryIds,
     budgetTargets,
+    savingsActuals,
     selectMonth,
     loadBudgetTargets,
+    loadSavingsActuals,
+    getSavingsNet,
     saveBudgetTarget,
     copyBudgetFromMonth,
     hideCategoryWithChildren,
@@ -441,6 +527,7 @@ const expandedParents = ref<Set<string>>(new Set());
 const saving = ref<boolean>(false);
 const showIncomeSection = ref<boolean>(true);
 const showExpenseSection = ref<boolean>(true);
+const showSavingsSection = ref<boolean>(true);
 
 const showNumPad = ref<boolean>(false);
 const editingSubId = ref<string>('');
@@ -486,12 +573,21 @@ const allIncomeParents = computed<TransactionCategory[]>(() =>
     (categoriesStore.allTransactionCategories[CategoryType.Income] ?? []) as TransactionCategory[]
 );
 
+const allTransferParents = computed<TransactionCategory[]>(() =>
+    ((categoriesStore.allTransactionCategories[CategoryType.Transfer] ?? []) as TransactionCategory[])
+        .filter(p => p.name === 'Savings & Investments')
+);
+
 const hiddenExpenseParents = computed<TransactionCategory[]>(() =>
     allExpenseParents.value.filter(p => hiddenCategoryIds.value.has(p.id))
 );
 
 const hiddenIncomeParents = computed<TransactionCategory[]>(() =>
     allIncomeParents.value.filter(p => hiddenCategoryIds.value.has(p.id))
+);
+
+const hiddenSavingsParents = computed<TransactionCategory[]>(() =>
+    allTransferParents.value.filter(p => hiddenCategoryIds.value.has(p.id))
 );
 
 interface HiddenSubItem { sub: TransactionCategory; parent: TransactionCategory; }
@@ -518,15 +614,28 @@ const hiddenIncomeSubsUnderVisibleParent = computed<HiddenSubItem[]>(() => {
     return result;
 });
 
+const hiddenSavingsSubsUnderVisibleParent = computed<HiddenSubItem[]>(() => {
+    const result: HiddenSubItem[] = [];
+    for (const parent of allTransferParents.value) {
+        if (hiddenCategoryIds.value.has(parent.id)) continue;
+        for (const sub of (parent.subCategories ?? [])) {
+            if (hiddenCategoryIds.value.has(sub.id)) result.push({ sub, parent });
+        }
+    }
+    return result;
+});
+
 const hasHiddenItems = computed<boolean>(() =>
     hiddenExpenseParents.value.length > 0 ||
     hiddenIncomeParents.value.length > 0 ||
     hiddenExpenseSubsUnderVisibleParent.value.length > 0 ||
-    hiddenIncomeSubsUnderVisibleParent.value.length > 0
+    hiddenIncomeSubsUnderVisibleParent.value.length > 0 ||
+    hiddenSavingsParents.value.length > 0 ||
+    hiddenSavingsSubsUnderVisibleParent.value.length > 0
 );
 
 const hasAnyData = computed<boolean>(() =>
-    allExpenseParents.value.length > 0 || allIncomeParents.value.length > 0
+    allExpenseParents.value.length > 0 || allIncomeParents.value.length > 0 || allTransferParents.value.length > 0
 );
 
 const nowDate = new Date();
@@ -639,6 +748,49 @@ function isParentVisible(parent: TransactionCategory): boolean {
     return (parent.subCategories ?? []).some(sub => subBudgeted(sub.id) > 0 || subActual(sub.id) > 0);
 }
 
+// ---------- Savings single-column helpers ----------
+
+function subSavingsBudgeted(subcatId: string): number {
+    const c = col.value;
+    return budgetTargets.value[`${c.year}-${c.month}`]?.[subcatId]?.amount ?? 0;
+}
+
+function subSavingsActual(subcatId: string): number {
+    const c = col.value;
+    return getSavingsNet(subcatId, c.year, c.month);
+}
+
+function subSavingsRemaining(subcatId: string): number {
+    return subSavingsBudgeted(subcatId) - subSavingsActual(subcatId);
+}
+
+function parentSavingsBudgeted(parent: TransactionCategory): number {
+    return (parent.subCategories ?? []).reduce((sum, sub) => sum + subSavingsBudgeted(sub.id), 0);
+}
+
+function parentSavingsActual(parent: TransactionCategory): number {
+    return (parent.subCategories ?? []).reduce((sum, sub) => sum + subSavingsActual(sub.id), 0);
+}
+
+function parentSavingsRemaining(parent: TransactionCategory): number {
+    return parentSavingsBudgeted(parent) - parentSavingsActual(parent);
+}
+
+function isSavingsSubVisible(subId: string): boolean {
+    return !hiddenCategoryIds.value.has(subId) || subSavingsBudgeted(subId) > 0 || subSavingsActual(subId) !== 0;
+}
+
+function isSavingsParentVisible(parent: TransactionCategory): boolean {
+    if (!hiddenCategoryIds.value.has(parent.id)) return true;
+    return (parent.subCategories ?? []).some(sub => subSavingsBudgeted(sub.id) > 0 || subSavingsActual(sub.id) !== 0);
+}
+
+function savingsDiffClass(amount: number): string {
+    if (amount > 0) return 'text-color-red';
+    if (amount < 0) return 'text-color-green';
+    return '';
+}
+
 // ---------- Summary totals ----------
 
 const colExpenseBudgeted = computed<number>(() =>
@@ -657,8 +809,16 @@ const colIncomeActual = computed<number>(() =>
 );
 const colIncomeDiff = computed<number>(() => colIncomeBudgeted.value - colIncomeActual.value);
 
-const colNetBudgeted = computed<number>(() => colIncomeBudgeted.value - colExpenseBudgeted.value);
-const colNetActual = computed<number>(() => colIncomeActual.value - colExpenseActual.value);
+const colSavingsBudgeted = computed<number>(() =>
+    allTransferParents.value.flatMap(p => p.subCategories ?? []).reduce((s, sub) => s + subSavingsBudgeted(sub.id), 0)
+);
+const colSavingsActual = computed<number>(() =>
+    allTransferParents.value.flatMap(p => p.subCategories ?? []).reduce((s, sub) => s + subSavingsActual(sub.id), 0)
+);
+const colSavingsDiff = computed<number>(() => colSavingsBudgeted.value - colSavingsActual.value);
+
+const colNetBudgeted = computed<number>(() => colIncomeBudgeted.value - colExpenseBudgeted.value - colSavingsBudgeted.value);
+const colNetActual = computed<number>(() => colIncomeActual.value - colExpenseActual.value - colSavingsActual.value);
 const colNetDiff = computed<number>(() => colNetBudgeted.value - colNetActual.value);
 
 // ---------- Expand/collapse ----------
@@ -741,6 +901,7 @@ async function loadCurrentMonthData(): Promise<void> {
     const tasks: Promise<void>[] = [];
     if (!budgetTargets.value[key]) tasks.push(loadBudgetTargets(year, month));
     if (!spentByMonth.value[key]) tasks.push(loadStatsForMonth(year, month));
+    if (!savingsActuals.value[key]) tasks.push(loadSavingsActuals(year, month));
     await Promise.all(tasks);
 }
 
@@ -758,6 +919,7 @@ async function init(): Promise<void> {
         expandedParents.value = new Set([
             ...allExpenseParents.value.map(p => p.id),
             ...allIncomeParents.value.map(p => p.id),
+            ...allTransferParents.value.map(p => p.id),
         ]);
         await loadCurrentMonthData();
     } catch (error: unknown) {

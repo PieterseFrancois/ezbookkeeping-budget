@@ -45,6 +45,25 @@ type BudgetTargetDeleteRequest struct {
 	Id int64 `json:"id,string" binding:"required,min=1"`
 }
 
+// SavingsActualGetRequest represents all parameters of savings actuals request
+type SavingsActualGetRequest struct {
+	Year  int `form:"year" binding:"required,min=1"`
+	Month int `form:"month" binding:"required,min=1,max=12"`
+}
+
+// SavingsCategoryActual represents actual transfer amounts for a single transfer category
+type SavingsCategoryActual struct {
+	CategoryId  int64 `json:"categoryId,string"`
+	TransferOut int64 `json:"transferOut,string"`
+	TransferIn  int64 `json:"transferIn,string"`
+	Net         int64 `json:"net,string"`
+}
+
+// SavingsActualsResponse represents savings actuals response
+type SavingsActualsResponse struct {
+	Items []*SavingsCategoryActual `json:"items"`
+}
+
 // ToInfoResponse returns a view-object according to database model
 func (b *BudgetTarget) ToInfoResponse() *BudgetTargetInfoResponse {
 	return &BudgetTargetInfoResponse{

@@ -90,6 +90,27 @@
                                 >{{ fmt(colIncomeDiff(col)) }}</span>
                             </div>
 
+                            <!-- Savings summary row (click to collapse/expand savings section) -->
+                            <div
+                                class="d-flex align-center budget-summary-row cursor-pointer py-1 rounded"
+                                @click="showSavingsSection = !showSavingsSection"
+                            >
+                                <div class="budget-summary-name-cell d-flex align-center">
+                                    <v-icon
+                                        class="flex-shrink-0"
+                                        :icon="showSavingsSection ? mdiChevronDown : mdiChevronRight"
+                                        size="16"
+                                    />
+                                    <span class="text-body-2 font-weight-medium ms-1">{{ tt('Savings') }}</span>
+                                </div>
+                                <span class="budget-amt-cell text-end text-body-2">{{ fmt(colSavingsBudgeted(col)) }}</span>
+                                <span class="budget-amt-cell text-end text-body-2">{{ fmt(colSavingsActual(col)) }}</span>
+                                <span
+                                    class="budget-amt-cell text-end text-body-2"
+                                    :class="savingsDiffClass(colSavingsDiff(col))"
+                                >{{ fmt(colSavingsDiff(col)) }}</span>
+                            </div>
+
                             <!-- Net row (always visible, not collapsible) -->
                             <div class="d-flex align-center py-1">
                                 <div class="budget-summary-name-cell">
@@ -329,6 +350,110 @@
                                 </template>
                             </template>
 
+                            <v-divider v-if="(showExpenseSection || showIncomeSection) && showSavingsSection" class="my-3" />
+
+                            <!-- Savings section -->
+                            <template v-if="showSavingsSection">
+                                <div class="text-caption text-medium-emphasis mt-1 mb-1 ps-1 budget-section-label">
+                                    {{ tt('Savings') }}
+                                </div>
+                                <template v-for="parent in allTransferParents" :key="parent.id">
+                                    <template v-if="isSavingsParentVisibleInCol(parent, col)">
+                                        <v-divider class="mb-1" />
+                                        <div class="d-flex align-center budget-parent-row py-1">
+                                            <v-btn
+                                                density="compact"
+                                                variant="text"
+                                                size="x-small"
+                                                class="flex-shrink-0 me-1"
+                                                :icon="expandedParents.has(parent.id) ? mdiChevronDown : mdiChevronRight"
+                                                @click="toggleExpanded(parent.id)"
+                                            />
+                                            <span class="budget-name-cell font-weight-bold text-body-2 text-truncate pe-1">
+                                                {{ parent.name }}
+                                            </span>
+                                            <span class="budget-amt-cell text-end text-body-2">
+                                                {{ fmt(parentSavingsBudgeted(parent, col)) }}
+                                            </span>
+                                            <span class="budget-amt-cell text-end text-body-2">
+                                                {{ fmt(parentSavingsActual(parent, col)) }}
+                                            </span>
+                                            <span
+                                                class="budget-amt-cell text-end text-body-2"
+                                                :class="savingsDiffClass(parentSavingsRemaining(parent, col))"
+                                            >{{ fmt(parentSavingsRemaining(parent, col)) }}</span>
+                                            <div class="budget-eye-cell d-flex justify-center">
+                                                <v-btn
+                                                    v-if="!hiddenCategoryIds.has(parent.id) && parentSavingsBudgeted(parent, col) === 0"
+                                                    density="compact"
+                                                    variant="text"
+                                                    size="x-small"
+                                                    class="budget-eye-btn"
+                                                    @click="onHideParent(parent)"
+                                                >
+                                                    <v-icon :icon="mdiEyeOff" size="16" />
+                                                    <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
+                                                </v-btn>
+                                            </div>
+                                        </div>
+
+                                        <template v-if="expandedParents.has(parent.id)">
+                                            <template v-for="sub in (parent.subCategories ?? [])" :key="sub.id">
+                                                <div
+                                                    v-if="isSavingsSubVisibleInCol(sub.id, col)"
+                                                    class="d-flex align-center budget-sub-row py-1 ps-6"
+                                                >
+                                                    <span class="budget-name-cell text-body-2 text-medium-emphasis text-truncate pe-1">
+                                                        {{ sub.name }}
+                                                    </span>
+                                                    <div class="budget-amt-cell d-flex justify-end align-center">
+                                                        <v-text-field
+                                                            v-if="isEditing(sub.id, col)"
+                                                            v-model="editingText"
+                                                            density="compact"
+                                                            variant="plain"
+                                                            hide-details
+                                                            class="budget-edit-field"
+                                                            autofocus
+                                                            @focus="($event.target as HTMLInputElement).select()"
+                                                            @keydown.enter="commitEdit"
+                                                            @keydown.escape="cancelEdit"
+                                                            @blur="commitEdit"
+                                                        />
+                                                        <span
+                                                            v-else
+                                                            class="cursor-pointer text-body-2 budget-budgeted-span"
+                                                            :class="{ 'text-medium-emphasis': subSavingsBudgeted(sub.id, col) === 0 }"
+                                                            @click="startEdit(sub.id, col)"
+                                                        >{{ fmt(subSavingsBudgeted(sub.id, col)) }}</span>
+                                                    </div>
+                                                    <span class="budget-amt-cell text-end text-body-2">
+                                                        {{ fmt(subSavingsActual(sub.id, col)) }}
+                                                    </span>
+                                                    <span
+                                                        class="budget-amt-cell text-end text-body-2"
+                                                        :class="savingsDiffClass(subSavingsRemaining(sub.id, col))"
+                                                    >{{ fmt(subSavingsRemaining(sub.id, col)) }}</span>
+                                                    <div class="budget-eye-cell d-flex justify-center">
+                                                        <v-btn
+                                                            v-if="!hiddenCategoryIds.has(sub.id) && subSavingsBudgeted(sub.id, col) === 0"
+                                                            density="compact"
+                                                            variant="text"
+                                                            size="x-small"
+                                                            class="budget-eye-btn"
+                                                            @click="onHideSub(sub.id)"
+                                                        >
+                                                            <v-icon :icon="mdiEyeOff" size="16" />
+                                                            <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
+                                                        </v-btn>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </template>
+                                    </template>
+                                </template>
+                            </template>
+
                             <!-- Empty state -->
                             <div
                                 v-if="!hasAnyData"
@@ -534,6 +659,34 @@
                             </template>
                         </v-list-item>
                     </template>
+
+                    <!-- Hidden savings parent categories -->
+                    <template v-for="parent in hiddenSavingsParents" :key="'sp-' + parent.id">
+                        <v-list-item
+                            :title="parent.name"
+                            :subtitle="tt('Savings')"
+                            class="cursor-pointer"
+                            @click="onAddParent(parent)"
+                        >
+                            <template #prepend>
+                                <v-icon :icon="mdiPlus" size="18" class="me-1" />
+                            </template>
+                        </v-list-item>
+                    </template>
+
+                    <!-- Hidden savings sub-categories (parent is visible) -->
+                    <template v-for="item in hiddenSavingsSubsUnderVisibleParent" :key="'ss-' + item.sub.id">
+                        <v-list-item
+                            :title="item.sub.name"
+                            :subtitle="item.parent.name + ' (' + tt('Savings') + ')'"
+                            class="cursor-pointer"
+                            @click="onAddSub(item.sub.id)"
+                        >
+                            <template #prepend>
+                                <v-icon :icon="mdiPlus" size="18" class="me-1" />
+                            </template>
+                        </v-list-item>
+                    </template>
                 </v-list>
             </v-card-text>
             <v-card-actions>
@@ -588,9 +741,12 @@ const {
     selectedMonth,
     hiddenCategoryIds,
     budgetTargets,
+    savingsActuals,
     threeMonthColumns,
     selectMonth,
     loadBudgetTargets,
+    loadSavingsActuals,
+    getSavingsNet,
     saveBudgetTarget,
     copyBudgetFromMonth,
     hideCategoryWithChildren,
@@ -612,6 +768,7 @@ const expandedParents = ref<Set<string>>(new Set());
 const saving = ref<boolean>(false);
 const showIncomeSection = ref<boolean>(true);
 const showExpenseSection = ref<boolean>(true);
+const showSavingsSection = ref<boolean>(true);
 
 interface EditingCell { categoryId: string; year: number; month: number; }
 const editingCell = ref<EditingCell | null>(null);
@@ -655,12 +812,21 @@ const allIncomeParents = computed<TransactionCategory[]>(() =>
     (categoriesStore.allTransactionCategories[CategoryType.Income] ?? []) as TransactionCategory[]
 );
 
+const allTransferParents = computed<TransactionCategory[]>(() =>
+    ((categoriesStore.allTransactionCategories[CategoryType.Transfer] ?? []) as TransactionCategory[])
+        .filter(p => p.name === 'Savings & Investments')
+);
+
 const hiddenExpenseParents = computed<TransactionCategory[]>(() =>
     allExpenseParents.value.filter(p => hiddenCategoryIds.value.has(p.id))
 );
 
 const hiddenIncomeParents = computed<TransactionCategory[]>(() =>
     allIncomeParents.value.filter(p => hiddenCategoryIds.value.has(p.id))
+);
+
+const hiddenSavingsParents = computed<TransactionCategory[]>(() =>
+    allTransferParents.value.filter(p => hiddenCategoryIds.value.has(p.id))
 );
 
 interface HiddenSubItem { sub: TransactionCategory; parent: TransactionCategory; }
@@ -687,15 +853,28 @@ const hiddenIncomeSubsUnderVisibleParent = computed<HiddenSubItem[]>(() => {
     return result;
 });
 
+const hiddenSavingsSubsUnderVisibleParent = computed<HiddenSubItem[]>(() => {
+    const result: HiddenSubItem[] = [];
+    for (const parent of allTransferParents.value) {
+        if (hiddenCategoryIds.value.has(parent.id)) continue;
+        for (const sub of (parent.subCategories ?? [])) {
+            if (hiddenCategoryIds.value.has(sub.id)) result.push({ sub, parent });
+        }
+    }
+    return result;
+});
+
 const hasHiddenItems = computed<boolean>(() =>
     hiddenExpenseParents.value.length > 0 ||
     hiddenIncomeParents.value.length > 0 ||
     hiddenExpenseSubsUnderVisibleParent.value.length > 0 ||
-    hiddenIncomeSubsUnderVisibleParent.value.length > 0
+    hiddenIncomeSubsUnderVisibleParent.value.length > 0 ||
+    hiddenSavingsParents.value.length > 0 ||
+    hiddenSavingsSubsUnderVisibleParent.value.length > 0
 );
 
 const hasAnyData = computed<boolean>(() =>
-    allExpenseParents.value.length > 0 || allIncomeParents.value.length > 0
+    allExpenseParents.value.length > 0 || allIncomeParents.value.length > 0 || allTransferParents.value.length > 0
 );
 
 const nowDate = new Date();
@@ -769,6 +948,12 @@ function diffClass(diff: number): string {
     return '';
 }
 
+function savingsDiffClass(diff: number): string {
+    if (diff > 0) return 'text-error';
+    if (diff < 0) return 'text-success';
+    return '';
+}
+
 // ---------- Per-column visibility (change #4) ----------
 
 function isSubVisibleInCol(subId: string, col: { year: number; month: number }): boolean {
@@ -806,6 +991,41 @@ function parentRemaining(parent: TransactionCategory, col: { year: number; month
     return parentBudgeted(parent, col) - parentActual(parent, col);
 }
 
+// ---------- Savings amount helpers ----------
+
+function subSavingsBudgeted(subcatId: string, col: { year: number; month: number }): number {
+    return budgetTargets.value[`${col.year}-${col.month}`]?.[subcatId]?.amount ?? 0;
+}
+
+function subSavingsActual(subcatId: string, col: { year: number; month: number }): number {
+    return getSavingsNet(subcatId, col.year, col.month);
+}
+
+function subSavingsRemaining(subcatId: string, col: { year: number; month: number }): number {
+    return subSavingsBudgeted(subcatId, col) - subSavingsActual(subcatId, col);
+}
+
+function parentSavingsBudgeted(parent: TransactionCategory, col: { year: number; month: number }): number {
+    return (parent.subCategories ?? []).reduce((sum, sub) => sum + subSavingsBudgeted(sub.id, col), 0);
+}
+
+function parentSavingsActual(parent: TransactionCategory, col: { year: number; month: number }): number {
+    return (parent.subCategories ?? []).reduce((sum, sub) => sum + subSavingsActual(sub.id, col), 0);
+}
+
+function parentSavingsRemaining(parent: TransactionCategory, col: { year: number; month: number }): number {
+    return parentSavingsBudgeted(parent, col) - parentSavingsActual(parent, col);
+}
+
+function isSavingsSubVisibleInCol(subId: string, col: { year: number; month: number }): boolean {
+    return !hiddenCategoryIds.value.has(subId) || subSavingsBudgeted(subId, col) > 0 || subSavingsActual(subId, col) !== 0;
+}
+
+function isSavingsParentVisibleInCol(parent: TransactionCategory, col: { year: number; month: number }): boolean {
+    if (!hiddenCategoryIds.value.has(parent.id)) return true;
+    return (parent.subCategories ?? []).some(sub => subSavingsBudgeted(sub.id, col) > 0 || subSavingsActual(sub.id, col) !== 0);
+}
+
 // ---------- Column summary totals (change #6) ----------
 
 function colIncomeBudgeted(col: { year: number; month: number }): number {
@@ -840,12 +1060,28 @@ function colExpenseDiff(col: { year: number; month: number }): number {
     return colExpenseBudgeted(col) - colExpenseActual(col);
 }
 
+function colSavingsBudgeted(col: { year: number; month: number }): number {
+    return allTransferParents.value
+        .flatMap(p => p.subCategories ?? [])
+        .reduce((sum, sub) => sum + subSavingsBudgeted(sub.id, col), 0);
+}
+
+function colSavingsActual(col: { year: number; month: number }): number {
+    return allTransferParents.value
+        .flatMap(p => p.subCategories ?? [])
+        .reduce((sum, sub) => sum + subSavingsActual(sub.id, col), 0);
+}
+
+function colSavingsDiff(col: { year: number; month: number }): number {
+    return colSavingsBudgeted(col) - colSavingsActual(col);
+}
+
 function colNetBudgeted(col: { year: number; month: number }): number {
-    return colIncomeBudgeted(col) - colExpenseBudgeted(col);
+    return colIncomeBudgeted(col) - colExpenseBudgeted(col) - colSavingsBudgeted(col);
 }
 
 function colNetActual(col: { year: number; month: number }): number {
-    return colIncomeActual(col) - colExpenseActual(col);
+    return colIncomeActual(col) - colExpenseActual(col) - colSavingsActual(col);
 }
 
 function colNetDiff(col: { year: number; month: number }): number {
@@ -944,6 +1180,7 @@ async function loadMonthData(year: number, month: number): Promise<void> {
     const tasks: Promise<void>[] = [];
     if (!budgetTargets.value[key]) tasks.push(loadBudgetTargets(year, month));
     if (!spentByMonth.value[key]) tasks.push(loadStatsForMonth(year, month));
+    if (!savingsActuals.value[key]) tasks.push(loadSavingsActuals(year, month));
     await Promise.all(tasks);
 }
 
@@ -963,6 +1200,7 @@ async function init(): Promise<void> {
         expandedParents.value = new Set([
             ...allExpenseParents.value.map(p => p.id),
             ...allIncomeParents.value.map(p => p.id),
+            ...allTransferParents.value.map(p => p.id),
         ]);
         await Promise.all(threeMonthColumns.value.map(col => loadMonthData(col.year, col.month)));
     } catch (error: unknown) {

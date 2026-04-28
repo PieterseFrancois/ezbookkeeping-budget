@@ -10,15 +10,53 @@ import (
 
 // BudgetApi represents budget api
 type BudgetApi struct {
-	budgetTargets *services.BudgetService
+	budgetTargets         *services.BudgetService
+	transactionCategories *services.TransactionCategoryService
 }
 
 // Initialize a budget api singleton instance
 var (
 	Budget = &BudgetApi{
-		budgetTargets: services.BudgetTargets,
+		budgetTargets:         services.BudgetTargets,
+		transactionCategories: services.TransactionCategories,
 	}
 )
+
+// SavingsActualsHandler returns actual transfer amounts per transfer subcategory for the given year and month
+func (a *BudgetApi) SavingsActualsHandler(c *core.WebContext) (any, *errs.Error) {
+	var req models.SavingsActualGetRequest
+	err := c.ShouldBindQuery(&req)
+
+	if err != nil {
+		log.Warnf(c, "[budget.SavingsActualsHandler] parse request failed, because %s", err.Error())
+		return nil, errs.NewIncompleteOrIncorrectSubmissionError(err)
+	}
+
+	uid := c.GetCurrentUid()
+	allCategories, err := a.transactionCategories.GetAllCategoriesByUid(c, uid, models.CATEGORY_TYPE_TRANSFER, -1)
+
+	if err != nil {
+		log.Errorf(c, "[budget.SavingsActualsHandler] failed to get transaction categories for user \"uid:%d\", because %s", uid, err.Error())
+		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+
+	categoryIds := make([]int64, 0, len(allCategories))
+
+	for _, cat := range allCategories {
+		if cat.ParentCategoryId != models.LevelOneTransactionCategoryParentId {
+			categoryIds = append(categoryIds, cat.CategoryId)
+		}
+	}
+
+	items, err := a.budgetTargets.GetSavingsActuals(c, uid, req.Year, req.Month, categoryIds)
+
+	if err != nil {
+		log.Errorf(c, "[budget.SavingsActualsHandler] failed to get savings actuals for user \"uid:%d\", because %s", uid, err.Error())
+		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+
+	return &models.SavingsActualsResponse{Items: items}, nil
+}
 
 // BudgetTargetsHandler returns budget targets for the given year and month
 func (a *BudgetApi) BudgetTargetsHandler(c *core.WebContext) (any, *errs.Error) {
