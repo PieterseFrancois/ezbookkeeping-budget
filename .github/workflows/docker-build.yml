@@ -31,6 +31,7 @@ jobs:
         run: |
           echo "build_unix_time=$(date '+%s')" >> "$GITHUB_OUTPUT"
           echo "build_date=$(date '+%Y%m%d')" >> "$GITHUB_OUTPUT"
+          echo "image_name=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/ezbookkeeping-budget" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -43,7 +44,7 @@ jobs:
             BUILD_DATE=${{ steps.vars.outputs.build_date }}
             SKIP_TESTS=1
           tags: |
-            ghcr.io/${{ github.repository_owner }}/ezbookkeeping-budget:latest
-            ghcr.io/${{ github.repository_owner }}/ezbookkeeping-budget:sha-${{ github.sha }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/ezbookkeeping-budget:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/ezbookkeeping-budget:buildcache,mode=max
+            ${{ steps.vars.outputs.image_name }}:latest
+            ${{ steps.vars.outputs.image_name }}:sha-${{ github.sha }}
+          cache-from: type=registry,ref=${{ steps.vars.outputs.image_name }}:buildcache
+          cache-to: type=registry,ref=${{ steps.vars.outputs.image_name }}:buildcache,mode=max
