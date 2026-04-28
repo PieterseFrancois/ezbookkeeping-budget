@@ -347,7 +347,7 @@ async function loadBudgetOverview(): Promise<void> {
     }
 
     // Group budget targets by parent category; only parents with ≥1 budgeted subcategory are included
-    const parentGroups: Record<string, { name: string; totalBudgeted: number; totalSpent: number }> = {};
+    const parentGroups: Record<string, { name: string; icon: string; color: string; totalBudgeted: number; totalSpent: number }> = {};
 
     for (const target of targets) {
         const subCat = transactionCategoriesStore.allTransactionCategoriesMap[target.categoryId];
@@ -357,7 +357,7 @@ async function loadBudgetOverview(): Promise<void> {
         const parentCat = transactionCategoriesStore.allTransactionCategoriesMap[parentId];
         if (!parentCat) continue;
 
-        const group = parentGroups[parentId] ?? (parentGroups[parentId] = { name: parentCat.name, totalBudgeted: 0, totalSpent: 0 });
+        const group = parentGroups[parentId] ?? (parentGroups[parentId] = { name: parentCat.name, icon: parentCat.icon, color: parentCat.color, totalBudgeted: 0, totalSpent: 0 });
         group.totalBudgeted += Number(target.amount);
     }
 
@@ -371,6 +371,8 @@ async function loadBudgetOverview(): Promise<void> {
 
     const summary: BudgetSummaryItem[] = Object.values(parentGroups).map(g => ({
         categoryName: g.name,
+        iconId: g.icon,
+        color: g.color,
         budgeted: g.totalBudgeted,
         spent: g.totalSpent,
         remaining: g.totalBudgeted - g.totalSpent
@@ -389,7 +391,8 @@ async function loadBudgetOverview(): Promise<void> {
             : undefined;
 
         const categoryName = parentCat ? `${parentCat.name} > ${subCat.name}` : subCat.name;
-        unbudgetedList.push({ categoryName, spent });
+        const iconSource = parentCat ?? subCat;
+        unbudgetedList.push({ categoryName, iconId: iconSource.icon, color: iconSource.color, spent });
     }
 
     budgetSummary.value = summary;
