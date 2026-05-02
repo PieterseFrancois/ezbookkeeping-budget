@@ -66,7 +66,7 @@
                 <div class="budget-m-row">
                     <div class="budget-m-name-cell budget-m-net-name">{{ tt('Net') }}</div>
                     <span class="budget-m-amt-cell">{{ fmt(colNetBudgeted) }}</span>
-                    <span class="budget-m-amt-cell">{{ fmt(colNetActual) }}</span>
+                    <span class="budget-m-amt-cell" :class="diffClass(colNetActual)">{{ fmt(colNetActual) }}</span>
                     <span class="budget-m-amt-cell" :class="diffClass(colNetDiff)">{{ fmt(colNetDiff) }}</span>
                 </div>
             </f7-card-content>
@@ -104,7 +104,7 @@
                             </div>
                             <span class="budget-m-amt-cell">{{ fmt(parentBudgeted(parent)) }}</span>
                             <span class="budget-m-amt-cell">{{ fmt(parentActual(parent)) }}</span>
-                            <span class="budget-m-amt-cell" :class="{ 'budget-m-negative': parentRemaining(parent) < 0 }">{{ fmt(parentRemaining(parent)) }}</span>
+                            <span class="budget-m-amt-cell" :class="diffClass(parentRemaining(parent))">{{ fmt(parentRemaining(parent)) }}</span>
                             <div class="budget-m-eye-cell">
                                 <f7-link
                                     v-if="!hiddenCategoryIds.has(parent.id) && parentBudgeted(parent) === 0"
@@ -126,7 +126,7 @@
                                         <span :class="{ 'budget-m-zero': subBudgeted(sub.id) === 0 }">{{ fmt(subBudgeted(sub.id)) }}</span>
                                     </div>
                                     <span class="budget-m-amt-cell">{{ fmt(subActual(sub.id)) }}</span>
-                                    <span class="budget-m-amt-cell" :class="{ 'budget-m-negative': subRemaining(sub.id) < 0 }">{{ fmt(subRemaining(sub.id)) }}</span>
+                                    <span class="budget-m-amt-cell" :class="diffClass(subRemaining(sub.id))">{{ fmt(subRemaining(sub.id)) }}</span>
                                     <div class="budget-m-eye-cell">
                                         <f7-link
                                             v-if="!hiddenCategoryIds.has(sub.id) && subBudgeted(sub.id) === 0"
@@ -157,7 +157,7 @@
                             </div>
                             <span class="budget-m-amt-cell">{{ fmt(parentBudgeted(parent)) }}</span>
                             <span class="budget-m-amt-cell">{{ fmt(parentActual(parent)) }}</span>
-                            <span class="budget-m-amt-cell" :class="{ 'budget-m-negative': parentRemaining(parent) < 0 }">{{ fmt(parentRemaining(parent)) }}</span>
+                            <span class="budget-m-amt-cell" :class="diffClass(-parentRemaining(parent))">{{ fmt(-parentRemaining(parent)) }}</span>
                             <div class="budget-m-eye-cell">
                                 <f7-link
                                     v-if="!hiddenCategoryIds.has(parent.id) && parentBudgeted(parent) === 0"
@@ -179,7 +179,7 @@
                                         <span :class="{ 'budget-m-zero': subBudgeted(sub.id) === 0 }">{{ fmt(subBudgeted(sub.id)) }}</span>
                                     </div>
                                     <span class="budget-m-amt-cell">{{ fmt(subActual(sub.id)) }}</span>
-                                    <span class="budget-m-amt-cell" :class="{ 'budget-m-negative': subRemaining(sub.id) < 0 }">{{ fmt(subRemaining(sub.id)) }}</span>
+                                    <span class="budget-m-amt-cell" :class="diffClass(-subRemaining(sub.id))">{{ fmt(-subRemaining(sub.id)) }}</span>
                                     <div class="budget-m-eye-cell">
                                         <f7-link
                                             v-if="!hiddenCategoryIds.has(sub.id) && subBudgeted(sub.id) === 0"
@@ -807,7 +807,7 @@ const colIncomeBudgeted = computed<number>(() =>
 const colIncomeActual = computed<number>(() =>
     allIncomeParents.value.flatMap(p => p.subCategories ?? []).reduce((s, sub) => s + subActual(sub.id), 0)
 );
-const colIncomeDiff = computed<number>(() => colIncomeBudgeted.value - colIncomeActual.value);
+const colIncomeDiff = computed<number>(() => colIncomeActual.value - colIncomeBudgeted.value);
 
 const colSavingsBudgeted = computed<number>(() =>
     allTransferParents.value.flatMap(p => p.subCategories ?? []).reduce((s, sub) => s + subSavingsBudgeted(sub.id), 0)

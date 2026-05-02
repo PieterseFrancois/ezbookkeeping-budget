@@ -25,180 +25,250 @@
             </div>
         </v-col>
 
-        <!-- Three-column grid -->
+        <!-- Budget table -->
         <v-col cols="12" class="pt-3">
-            <div class="budget-columns-grid">
-                <v-card
-                    v-for="(col, colIdx) in threeMonthColumns"
-                    :key="`${col.year}-${col.month}`"
-                    class="budget-month-card"
-                    :class="{ 'budget-col-current': colIdx === 1 }"
-                >
-                    <template #title>
-                        <span class="text-subtitle-1">{{ formatColumnTitle(col) }}</span>
+            <div class="budget-table-wrap">
+                <div class="budget-table">
+
+                    <!-- ── Row 1: month title headers ── -->
+                    <div class="budget-name-col budget-th budget-th-corner"></div>
+                    <div
+                        v-for="(col, colIdx) in threeMonthColumns"
+                        :key="`th1-${col.year}-${col.month}`"
+                        class="budget-th budget-month-header"
+                        :class="{ 'budget-month-header--current': colIdx === 1 }"
+                        style="grid-column: span 3"
+                    >{{ formatColumnTitle(col) }}</div>
+
+                    <!-- ── Row 2: B / A / R sub-headers ── -->
+                    <div class="budget-name-col budget-th budget-th-sub-corner"></div>
+                    <template v-for="(col, colIdx) in threeMonthColumns" :key="`th2-${col.year}-${col.month}`">
+                        <div class="budget-th budget-th-sub budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ tt('Budgeted') }}</div>
+                        <div class="budget-th budget-th-sub" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ tt('Actual') }}</div>
+                        <div class="budget-th budget-th-sub" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ tt('Remaining') }}</div>
                     </template>
 
-                    <v-card-text class="pt-0">
-                        <!-- Column summary header -->
-                        <div class="budget-summary-section mb-2 pa-2 rounded">
-                            <div class="d-flex align-center text-caption text-medium-emphasis mb-1">
-                                <span class="budget-summary-name-cell"></span>
-                                <span class="budget-amt-cell text-end">{{ tt('Budgeted') }}</span>
-                                <span class="budget-amt-cell text-end">{{ tt('Actual') }}</span>
-                                <span class="budget-amt-cell text-end">{{ tt('Difference') }}</span>
-                            </div>
+                    <!-- ── Summary section top border ── -->
+                    <div class="budget-full-span budget-summary-border-top"></div>
 
-                            <!-- Expenses summary row (click to collapse/expand expense section) -->
-                            <div
-                                class="d-flex align-center budget-summary-row cursor-pointer py-1 rounded"
-                                @click="showExpenseSection = !showExpenseSection"
-                            >
-                                <div class="budget-summary-name-cell d-flex align-center">
-                                    <v-icon
-                                        class="flex-shrink-0"
-                                        :icon="showExpenseSection ? mdiChevronDown : mdiChevronRight"
-                                        size="16"
-                                    />
-                                    <span class="text-body-2 font-weight-medium ms-1">{{ tt('Expenses') }}</span>
-                                </div>
-                                <span class="budget-amt-cell text-end text-body-2">{{ fmt(colExpenseBudgeted(col)) }}</span>
-                                <span class="budget-amt-cell text-end text-body-2">{{ fmt(colExpenseActual(col)) }}</span>
-                                <span
-                                    class="budget-amt-cell text-end text-body-2"
-                                    :class="diffClass(colExpenseDiff(col))"
-                                >{{ fmt(colExpenseDiff(col)) }}</span>
-                            </div>
+                    <!-- Expenses summary row -->
+                    <div
+                        class="budget-name-col budget-summary-name cursor-pointer"
+                        @click="showExpenseSection = !showExpenseSection"
+                    >
+                        <v-icon class="flex-shrink-0" :icon="showExpenseSection ? mdiChevronDown : mdiChevronRight" size="16" />
+                        <span class="budget-row-name text-body-2 font-weight-medium ms-1">{{ tt('Expenses') }}</span>
+                    </div>
+                    <template v-for="(col, colIdx) in threeMonthColumns" :key="`sexp-${col.year}-${col.month}`">
+                        <div class="budget-summary-cell budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(colExpenseBudgeted(col)) }}</div>
+                        <div class="budget-summary-cell" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(colExpenseActual(col)) }}</div>
+                        <div class="budget-summary-cell" :class="[{ 'budget-col-current-tint': colIdx === 1 }, diffClass(colExpenseDiff(col))]">{{ fmt(colExpenseDiff(col)) }}</div>
+                    </template>
 
-                            <!-- Income summary row (click to collapse/expand income section) -->
-                            <div
-                                class="d-flex align-center budget-summary-row cursor-pointer py-1 rounded"
-                                @click="showIncomeSection = !showIncomeSection"
-                            >
-                                <div class="budget-summary-name-cell d-flex align-center">
-                                    <v-icon
-                                        class="flex-shrink-0"
-                                        :icon="showIncomeSection ? mdiChevronDown : mdiChevronRight"
-                                        size="16"
-                                    />
-                                    <span class="text-body-2 font-weight-medium ms-1">{{ tt('Income') }}</span>
-                                </div>
-                                <span class="budget-amt-cell text-end text-body-2">{{ fmt(colIncomeBudgeted(col)) }}</span>
-                                <span class="budget-amt-cell text-end text-body-2">{{ fmt(colIncomeActual(col)) }}</span>
-                                <span
-                                    class="budget-amt-cell text-end text-body-2"
-                                    :class="diffClass(colIncomeDiff(col))"
-                                >{{ fmt(colIncomeDiff(col)) }}</span>
-                            </div>
+                    <!-- Income summary row -->
+                    <div
+                        class="budget-name-col budget-summary-name cursor-pointer"
+                        @click="showIncomeSection = !showIncomeSection"
+                    >
+                        <v-icon class="flex-shrink-0" :icon="showIncomeSection ? mdiChevronDown : mdiChevronRight" size="16" />
+                        <span class="budget-row-name text-body-2 font-weight-medium ms-1">{{ tt('Income') }}</span>
+                    </div>
+                    <template v-for="(col, colIdx) in threeMonthColumns" :key="`sinc-${col.year}-${col.month}`">
+                        <div class="budget-summary-cell budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(colIncomeBudgeted(col)) }}</div>
+                        <div class="budget-summary-cell" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(colIncomeActual(col)) }}</div>
+                        <div class="budget-summary-cell" :class="[{ 'budget-col-current-tint': colIdx === 1 }, diffClass(colIncomeDiff(col))]">{{ fmt(colIncomeDiff(col)) }}</div>
+                    </template>
 
-                            <!-- Savings summary row (click to collapse/expand savings section) -->
-                            <div
-                                class="d-flex align-center budget-summary-row cursor-pointer py-1 rounded"
-                                @click="showSavingsSection = !showSavingsSection"
-                            >
-                                <div class="budget-summary-name-cell d-flex align-center">
-                                    <v-icon
-                                        class="flex-shrink-0"
-                                        :icon="showSavingsSection ? mdiChevronDown : mdiChevronRight"
-                                        size="16"
-                                    />
-                                    <span class="text-body-2 font-weight-medium ms-1">{{ tt('Savings') }}</span>
-                                </div>
-                                <span class="budget-amt-cell text-end text-body-2">{{ fmt(colSavingsBudgeted(col)) }}</span>
-                                <span class="budget-amt-cell text-end text-body-2">{{ fmt(colSavingsActual(col)) }}</span>
-                                <span
-                                    class="budget-amt-cell text-end text-body-2"
-                                    :class="savingsDiffClass(colSavingsDiff(col))"
-                                >{{ fmt(colSavingsDiff(col)) }}</span>
-                            </div>
+                    <!-- Savings summary row -->
+                    <div
+                        class="budget-name-col budget-summary-name cursor-pointer"
+                        @click="showSavingsSection = !showSavingsSection"
+                    >
+                        <v-icon class="flex-shrink-0" :icon="showSavingsSection ? mdiChevronDown : mdiChevronRight" size="16" />
+                        <span class="budget-row-name text-body-2 font-weight-medium ms-1">{{ tt('Savings') }}</span>
+                    </div>
+                    <template v-for="(col, colIdx) in threeMonthColumns" :key="`ssav-${col.year}-${col.month}`">
+                        <div class="budget-summary-cell budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(colSavingsBudgeted(col)) }}</div>
+                        <div class="budget-summary-cell" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(colSavingsActual(col)) }}</div>
+                        <div class="budget-summary-cell" :class="[{ 'budget-col-current-tint': colIdx === 1 }, savingsDiffClass(colSavingsDiff(col))]">{{ fmt(colSavingsDiff(col)) }}</div>
+                    </template>
 
-                            <!-- Net row (always visible, not collapsible) -->
-                            <div class="d-flex align-center py-1">
-                                <div class="budget-summary-name-cell">
-                                    <span class="text-body-2 font-weight-medium ps-5">{{ tt('Net') }}</span>
-                                </div>
-                                <span class="budget-amt-cell text-end text-body-2">{{ fmt(colNetBudgeted(col)) }}</span>
-                                <span class="budget-amt-cell text-end text-body-2">{{ fmt(colNetActual(col)) }}</span>
-                                <span
-                                    class="budget-amt-cell text-end text-body-2"
-                                    :class="diffClass(colNetDiff(col))"
-                                >{{ fmt(colNetDiff(col)) }}</span>
-                            </div>
-                        </div>
+                    <!-- Net row -->
+                    <div class="budget-name-col budget-summary-name">
+                        <span class="budget-row-name text-body-2 font-weight-medium ps-5">{{ tt('Net') }}</span>
+                    </div>
+                    <template v-for="(col, colIdx) in threeMonthColumns" :key="`snet-${col.year}-${col.month}`">
+                        <div class="budget-summary-cell budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(colNetBudgeted(col)) }}</div>
+                        <div class="budget-summary-cell" :class="[{ 'budget-col-current-tint': colIdx === 1 }, diffClass(colNetActual(col))]">{{ fmt(colNetActual(col)) }}</div>
+                        <div class="budget-summary-cell" :class="[{ 'budget-col-current-tint': colIdx === 1 }, diffClass(colNetDiff(col))]">{{ fmt(colNetDiff(col)) }}</div>
+                    </template>
 
-                        <v-divider class="mb-2" />
+                    <!-- ── Summary section bottom border ── -->
+                    <div class="budget-full-span budget-summary-border-bottom"></div>
 
-                        <!-- Column sub-header labels -->
-                        <div class="d-flex align-center mb-1 text-caption text-medium-emphasis">
-                            <span class="budget-name-cell pe-1"></span>
-                            <span class="budget-amt-cell text-end">{{ tt('Budgeted') }}</span>
-                            <span class="budget-amt-cell text-end">{{ tt('Actual') }}</span>
-                            <span class="budget-amt-cell text-end">{{ tt('Remaining') }}</span>
-                            <span class="budget-eye-cell"></span>
-                        </div>
-
-                        <!-- Skeleton while loading -->
-                        <template v-if="loading && !hasAnyData">
+                    <!-- ── Loading skeleton ── -->
+                    <template v-if="loading && !hasAnyData">
+                        <div class="budget-full-span px-2 py-3">
                             <div v-for="i in 4" :key="i" class="mb-2">
                                 <v-skeleton-loader width="100%" type="text" :loading="true" />
                             </div>
+                        </div>
+                    </template>
+
+                    <template v-else>
+                        <!-- ── EXPENSES section ── -->
+                        <template v-if="showExpenseSection">
+                            <div class="budget-full-span budget-section-label">{{ tt('Expenses') }}</div>
+
+                            <template v-for="parent in allExpenseParents" :key="parent.id">
+                                <template v-if="isParentVisibleInAnyCol(parent)">
+                                    <!-- Expense parent row -->
+                                    <div class="budget-name-col budget-parent-row">
+                                        <div class="budget-expand-cell d-flex align-center justify-center">
+                                            <v-btn
+                                                density="compact"
+                                                variant="text"
+                                                size="x-small"
+                                                :icon="expandedParents.has(parent.id) ? mdiChevronDown : mdiChevronRight"
+                                                @click="toggleExpanded(parent.id)"
+                                            />
+                                        </div>
+                                        <span class="budget-row-name font-weight-bold text-body-2 text-truncate">{{ parent.name }}</span>
+                                        <div class="budget-row-eye d-flex align-center justify-center">
+                                            <v-btn
+                                                v-if="parentCanHide(parent)"
+                                                density="compact"
+                                                variant="text"
+                                                size="x-small"
+                                                class="budget-eye-btn"
+                                                @click="onHideParent(parent)"
+                                            >
+                                                <v-icon :icon="mdiEyeOff" size="16" />
+                                                <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
+                                            </v-btn>
+                                        </div>
+                                    </div>
+                                    <template v-for="(col, colIdx) in threeMonthColumns" :key="`ep-${parent.id}-${col.year}-${col.month}`">
+                                        <div class="budget-data-cell budget-parent-body budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(parentBudgeted(parent, col)) }}</div>
+                                        <div class="budget-data-cell budget-parent-body" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(parentActual(parent, col)) }}</div>
+                                        <div class="budget-data-cell budget-parent-body" :class="[{ 'budget-col-current-tint': colIdx === 1 }, diffClass(parentRemaining(parent, col))]">{{ fmt(parentRemaining(parent, col)) }}</div>
+                                    </template>
+
+                                    <!-- Expense sub rows -->
+                                    <template v-if="expandedParents.has(parent.id)">
+                                        <template v-for="sub in (parent.subCategories ?? [])" :key="sub.id">
+                                            <template v-if="isSubVisibleInAnyCol(sub.id)">
+                                                <div class="budget-name-col budget-sub-row">
+                                                    <span class="budget-row-name text-body-2 text-medium-emphasis text-truncate">{{ sub.name }}</span>
+                                                    <div class="budget-row-eye d-flex align-center justify-center">
+                                                        <v-btn
+                                                            v-if="subCanHide(sub.id)"
+                                                            density="compact"
+                                                            variant="text"
+                                                            size="x-small"
+                                                            class="budget-eye-btn"
+                                                            @click="onHideSub(sub.id)"
+                                                        >
+                                                            <v-icon :icon="mdiEyeOff" size="16" />
+                                                            <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
+                                                        </v-btn>
+                                                    </div>
+                                                </div>
+                                                <template v-for="(col, colIdx) in threeMonthColumns" :key="`es-${sub.id}-${col.year}-${col.month}`">
+                                                    <div class="budget-data-cell budget-sub-body budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">
+                                                        <v-text-field
+                                                            v-if="isEditing(sub.id, col)"
+                                                            v-model="editingText"
+                                                            density="compact"
+                                                            variant="plain"
+                                                            hide-details
+                                                            class="budget-edit-field"
+                                                            autofocus
+                                                            @focus="($event.target as HTMLInputElement).select()"
+                                                            @keydown.enter="commitEdit"
+                                                            @keydown.escape="cancelEdit"
+                                                            @blur="commitEdit"
+                                                        />
+                                                        <span
+                                                            v-else
+                                                            class="cursor-pointer text-body-2 budget-budgeted-span"
+                                                            :class="{ 'text-medium-emphasis': subBudgeted(sub.id, col) === 0 }"
+                                                            @click="startEdit(sub.id, col)"
+                                                        >{{ fmt(subBudgeted(sub.id, col)) }}</span>
+                                                    </div>
+                                                    <div class="budget-data-cell budget-sub-body" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(subActual(sub.id, col)) }}</div>
+                                                    <div class="budget-data-cell budget-sub-body" :class="[{ 'budget-col-current-tint': colIdx === 1 }, diffClass(subRemaining(sub.id, col))]">{{ fmt(subRemaining(sub.id, col)) }}</div>
+                                                </template>
+                                            </template>
+                                        </template>
+                                    </template>
+                                </template>
+                            </template>
                         </template>
 
-                        <template v-else>
-                            <!-- Expense section -->
-                            <template v-if="showExpenseSection">
-                                <div class="text-caption text-medium-emphasis mt-1 mb-1 ps-1 budget-section-label">
-                                    {{ tt('Expenses') }}
-                                </div>
-                                <template v-for="parent in allExpenseParents" :key="parent.id">
-                                    <template v-if="isParentVisibleInCol(parent, col)">
-                                        <v-divider class="mb-1" />
-                                        <div class="d-flex align-center budget-parent-row py-1">
+                        <!-- Divider between Expenses and Income -->
+                        <div v-if="showExpenseSection && showIncomeSection" class="budget-full-span budget-section-divider"></div>
+
+                        <!-- ── INCOME section ── -->
+                        <template v-if="showIncomeSection">
+                            <div class="budget-full-span budget-section-label">{{ tt('Income') }}</div>
+
+                            <template v-for="parent in allIncomeParents" :key="parent.id">
+                                <template v-if="isParentVisibleInAnyCol(parent)">
+                                    <!-- Income parent row -->
+                                    <div class="budget-name-col budget-parent-row">
+                                        <div class="budget-expand-cell d-flex align-center justify-center">
                                             <v-btn
                                                 density="compact"
                                                 variant="text"
                                                 size="x-small"
-                                                class="flex-shrink-0 me-1"
                                                 :icon="expandedParents.has(parent.id) ? mdiChevronDown : mdiChevronRight"
                                                 @click="toggleExpanded(parent.id)"
                                             />
-                                            <span class="budget-name-cell font-weight-bold text-body-2 text-truncate pe-1">
-                                                {{ parent.name }}
-                                            </span>
-                                            <span class="budget-amt-cell text-end text-body-2">
-                                                {{ fmt(parentBudgeted(parent, col)) }}
-                                            </span>
-                                            <span class="budget-amt-cell text-end text-body-2">
-                                                {{ fmt(parentActual(parent, col)) }}
-                                            </span>
-                                            <span
-                                                class="budget-amt-cell text-end text-body-2"
-                                                :class="{ 'text-error': parentRemaining(parent, col) < 0 }"
-                                            >{{ fmt(parentRemaining(parent, col)) }}</span>
-                                            <div class="budget-eye-cell d-flex justify-center">
-                                                <v-btn
-                                                    v-if="!hiddenCategoryIds.has(parent.id) && parentBudgeted(parent, col) === 0"
-                                                    density="compact"
-                                                    variant="text"
-                                                    size="x-small"
-                                                    class="budget-eye-btn"
-                                                    @click="onHideParent(parent)"
-                                                >
-                                                    <v-icon :icon="mdiEyeOff" size="16" />
-                                                    <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
-                                                </v-btn>
-                                            </div>
                                         </div>
+                                        <span class="budget-row-name font-weight-bold text-body-2 text-truncate">{{ parent.name }}</span>
+                                        <div class="budget-row-eye d-flex align-center justify-center">
+                                            <v-btn
+                                                v-if="parentCanHide(parent)"
+                                                density="compact"
+                                                variant="text"
+                                                size="x-small"
+                                                class="budget-eye-btn"
+                                                @click="onHideParent(parent)"
+                                            >
+                                                <v-icon :icon="mdiEyeOff" size="16" />
+                                                <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
+                                            </v-btn>
+                                        </div>
+                                    </div>
+                                    <template v-for="(col, colIdx) in threeMonthColumns" :key="`ip-${parent.id}-${col.year}-${col.month}`">
+                                        <div class="budget-data-cell budget-parent-body budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(parentBudgeted(parent, col)) }}</div>
+                                        <div class="budget-data-cell budget-parent-body" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(parentActual(parent, col)) }}</div>
+                                        <div class="budget-data-cell budget-parent-body" :class="[{ 'budget-col-current-tint': colIdx === 1 }, diffClass(-parentRemaining(parent, col))]">{{ fmt(-parentRemaining(parent, col)) }}</div>
+                                    </template>
 
-                                        <template v-if="expandedParents.has(parent.id)">
-                                            <template v-for="sub in (parent.subCategories ?? [])" :key="sub.id">
-                                                <div
-                                                    v-if="isSubVisibleInCol(sub.id, col)"
-                                                    class="d-flex align-center budget-sub-row py-1 ps-6"
-                                                >
-                                                    <span class="budget-name-cell text-body-2 text-medium-emphasis text-truncate pe-1">
-                                                        {{ sub.name }}
-                                                    </span>
-                                                    <div class="budget-amt-cell d-flex justify-end align-center">
+                                    <!-- Income sub rows -->
+                                    <template v-if="expandedParents.has(parent.id)">
+                                        <template v-for="sub in (parent.subCategories ?? [])" :key="sub.id">
+                                            <template v-if="isSubVisibleInAnyCol(sub.id)">
+                                                <div class="budget-name-col budget-sub-row">
+                                                    <span class="budget-row-name text-body-2 text-medium-emphasis text-truncate">{{ sub.name }}</span>
+                                                    <div class="budget-row-eye d-flex align-center justify-center">
+                                                        <v-btn
+                                                            v-if="subCanHide(sub.id)"
+                                                            density="compact"
+                                                            variant="text"
+                                                            size="x-small"
+                                                            class="budget-eye-btn"
+                                                            @click="onHideSub(sub.id)"
+                                                        >
+                                                            <v-icon :icon="mdiEyeOff" size="16" />
+                                                            <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
+                                                        </v-btn>
+                                                    </div>
+                                                </div>
+                                                <template v-for="(col, colIdx) in threeMonthColumns" :key="`is-${sub.id}-${col.year}-${col.month}`">
+                                                    <div class="budget-data-cell budget-sub-body budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">
                                                         <v-text-field
                                                             v-if="isEditing(sub.id, col)"
                                                             v-model="editingText"
@@ -219,16 +289,66 @@
                                                             @click="startEdit(sub.id, col)"
                                                         >{{ fmt(subBudgeted(sub.id, col)) }}</span>
                                                     </div>
-                                                    <span class="budget-amt-cell text-end text-body-2">
-                                                        {{ fmt(subActual(sub.id, col)) }}
-                                                    </span>
-                                                    <span
-                                                        class="budget-amt-cell text-end text-body-2"
-                                                        :class="{ 'text-error': subRemaining(sub.id, col) < 0 }"
-                                                    >{{ fmt(subRemaining(sub.id, col)) }}</span>
-                                                    <div class="budget-eye-cell d-flex justify-center">
+                                                    <div class="budget-data-cell budget-sub-body" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(subActual(sub.id, col)) }}</div>
+                                                    <div class="budget-data-cell budget-sub-body" :class="[{ 'budget-col-current-tint': colIdx === 1 }, diffClass(-subRemaining(sub.id, col))]">{{ fmt(-subRemaining(sub.id, col)) }}</div>
+                                                </template>
+                                            </template>
+                                        </template>
+                                    </template>
+                                </template>
+                            </template>
+                        </template>
+
+                        <!-- Divider between Income/Expenses and Savings -->
+                        <div v-if="(showExpenseSection || showIncomeSection) && showSavingsSection" class="budget-full-span budget-section-divider"></div>
+
+                        <!-- ── SAVINGS section ── -->
+                        <template v-if="showSavingsSection">
+                            <div class="budget-full-span budget-section-label">{{ tt('Savings') }}</div>
+
+                            <template v-for="parent in allTransferParents" :key="parent.id">
+                                <template v-if="isSavingsParentVisibleInAnyCol(parent)">
+                                    <!-- Savings parent row -->
+                                    <div class="budget-name-col budget-parent-row">
+                                        <div class="budget-expand-cell d-flex align-center justify-center">
+                                            <v-btn
+                                                density="compact"
+                                                variant="text"
+                                                size="x-small"
+                                                :icon="expandedParents.has(parent.id) ? mdiChevronDown : mdiChevronRight"
+                                                @click="toggleExpanded(parent.id)"
+                                            />
+                                        </div>
+                                        <span class="budget-row-name font-weight-bold text-body-2 text-truncate">{{ parent.name }}</span>
+                                        <div class="budget-row-eye d-flex align-center justify-center">
+                                            <v-btn
+                                                v-if="savingsParentCanHide(parent)"
+                                                density="compact"
+                                                variant="text"
+                                                size="x-small"
+                                                class="budget-eye-btn"
+                                                @click="onHideParent(parent)"
+                                            >
+                                                <v-icon :icon="mdiEyeOff" size="16" />
+                                                <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
+                                            </v-btn>
+                                        </div>
+                                    </div>
+                                    <template v-for="(col, colIdx) in threeMonthColumns" :key="`sp-${parent.id}-${col.year}-${col.month}`">
+                                        <div class="budget-data-cell budget-parent-body budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(parentSavingsBudgeted(parent, col)) }}</div>
+                                        <div class="budget-data-cell budget-parent-body" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(parentSavingsActual(parent, col)) }}</div>
+                                        <div class="budget-data-cell budget-parent-body" :class="[{ 'budget-col-current-tint': colIdx === 1 }, savingsDiffClass(parentSavingsRemaining(parent, col))]">{{ fmt(parentSavingsRemaining(parent, col)) }}</div>
+                                    </template>
+
+                                    <!-- Savings sub rows -->
+                                    <template v-if="expandedParents.has(parent.id)">
+                                        <template v-for="sub in (parent.subCategories ?? [])" :key="sub.id">
+                                            <template v-if="isSavingsSubVisibleInAnyCol(sub.id)">
+                                                <div class="budget-name-col budget-sub-row">
+                                                    <span class="budget-row-name text-body-2 text-medium-emphasis text-truncate">{{ sub.name }}</span>
+                                                    <div class="budget-row-eye d-flex align-center justify-center">
                                                         <v-btn
-                                                            v-if="!hiddenCategoryIds.has(sub.id) && subBudgeted(sub.id, col) === 0"
+                                                            v-if="savingsSubCanHide(sub.id)"
                                                             density="compact"
                                                             variant="text"
                                                             size="x-small"
@@ -240,173 +360,8 @@
                                                         </v-btn>
                                                     </div>
                                                 </div>
-                                            </template>
-                                        </template>
-                                    </template>
-                                </template>
-                            </template>
-
-                            <v-divider v-if="showExpenseSection && showIncomeSection" class="my-3" />
-
-                            <!-- Income section -->
-                            <template v-if="showIncomeSection">
-                                <div class="text-caption text-medium-emphasis mt-1 mb-1 ps-1 budget-section-label">
-                                    {{ tt('Income') }}
-                                </div>
-                                <template v-for="parent in allIncomeParents" :key="parent.id">
-                                    <template v-if="isParentVisibleInCol(parent, col)">
-                                        <v-divider class="mb-1" />
-                                        <div class="d-flex align-center budget-parent-row py-1">
-                                            <v-btn
-                                                density="compact"
-                                                variant="text"
-                                                size="x-small"
-                                                class="flex-shrink-0 me-1"
-                                                :icon="expandedParents.has(parent.id) ? mdiChevronDown : mdiChevronRight"
-                                                @click="toggleExpanded(parent.id)"
-                                            />
-                                            <span class="budget-name-cell font-weight-bold text-body-2 text-truncate pe-1">
-                                                {{ parent.name }}
-                                            </span>
-                                            <span class="budget-amt-cell text-end text-body-2">
-                                                {{ fmt(parentBudgeted(parent, col)) }}
-                                            </span>
-                                            <span class="budget-amt-cell text-end text-body-2">
-                                                {{ fmt(parentActual(parent, col)) }}
-                                            </span>
-                                            <span
-                                                class="budget-amt-cell text-end text-body-2"
-                                                :class="{ 'text-error': parentRemaining(parent, col) < 0 }"
-                                            >{{ fmt(parentRemaining(parent, col)) }}</span>
-                                            <div class="budget-eye-cell d-flex justify-center">
-                                                <v-btn
-                                                    v-if="!hiddenCategoryIds.has(parent.id) && parentBudgeted(parent, col) === 0"
-                                                    density="compact"
-                                                    variant="text"
-                                                    size="x-small"
-                                                    class="budget-eye-btn"
-                                                    @click="onHideParent(parent)"
-                                                >
-                                                    <v-icon :icon="mdiEyeOff" size="16" />
-                                                    <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
-                                                </v-btn>
-                                            </div>
-                                        </div>
-
-                                        <template v-if="expandedParents.has(parent.id)">
-                                            <template v-for="sub in (parent.subCategories ?? [])" :key="sub.id">
-                                                <div
-                                                    v-if="isSubVisibleInCol(sub.id, col)"
-                                                    class="d-flex align-center budget-sub-row py-1 ps-6"
-                                                >
-                                                    <span class="budget-name-cell text-body-2 text-medium-emphasis text-truncate pe-1">
-                                                        {{ sub.name }}
-                                                    </span>
-                                                    <div class="budget-amt-cell d-flex justify-end align-center">
-                                                        <v-text-field
-                                                            v-if="isEditing(sub.id, col)"
-                                                            v-model="editingText"
-                                                            density="compact"
-                                                            variant="plain"
-                                                            hide-details
-                                                            class="budget-edit-field"
-                                                            autofocus
-                                                            @focus="($event.target as HTMLInputElement).select()"
-                                                            @keydown.enter="commitEdit"
-                                                            @keydown.escape="cancelEdit"
-                                                            @blur="commitEdit"
-                                                        />
-                                                        <span
-                                                            v-else
-                                                            class="cursor-pointer text-body-2 budget-budgeted-span"
-                                                            :class="{ 'text-medium-emphasis': subBudgeted(sub.id, col) === 0 }"
-                                                            @click="startEdit(sub.id, col)"
-                                                        >{{ fmt(subBudgeted(sub.id, col)) }}</span>
-                                                    </div>
-                                                    <span class="budget-amt-cell text-end text-body-2">
-                                                        {{ fmt(subActual(sub.id, col)) }}
-                                                    </span>
-                                                    <span
-                                                        class="budget-amt-cell text-end text-body-2"
-                                                        :class="{ 'text-error': subRemaining(sub.id, col) < 0 }"
-                                                    >{{ fmt(subRemaining(sub.id, col)) }}</span>
-                                                    <div class="budget-eye-cell d-flex justify-center">
-                                                        <v-btn
-                                                            v-if="!hiddenCategoryIds.has(sub.id) && subBudgeted(sub.id, col) === 0"
-                                                            density="compact"
-                                                            variant="text"
-                                                            size="x-small"
-                                                            class="budget-eye-btn"
-                                                            @click="onHideSub(sub.id)"
-                                                        >
-                                                            <v-icon :icon="mdiEyeOff" size="16" />
-                                                            <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
-                                                        </v-btn>
-                                                    </div>
-                                                </div>
-                                            </template>
-                                        </template>
-                                    </template>
-                                </template>
-                            </template>
-
-                            <v-divider v-if="(showExpenseSection || showIncomeSection) && showSavingsSection" class="my-3" />
-
-                            <!-- Savings section -->
-                            <template v-if="showSavingsSection">
-                                <div class="text-caption text-medium-emphasis mt-1 mb-1 ps-1 budget-section-label">
-                                    {{ tt('Savings') }}
-                                </div>
-                                <template v-for="parent in allTransferParents" :key="parent.id">
-                                    <template v-if="isSavingsParentVisibleInCol(parent, col)">
-                                        <v-divider class="mb-1" />
-                                        <div class="d-flex align-center budget-parent-row py-1">
-                                            <v-btn
-                                                density="compact"
-                                                variant="text"
-                                                size="x-small"
-                                                class="flex-shrink-0 me-1"
-                                                :icon="expandedParents.has(parent.id) ? mdiChevronDown : mdiChevronRight"
-                                                @click="toggleExpanded(parent.id)"
-                                            />
-                                            <span class="budget-name-cell font-weight-bold text-body-2 text-truncate pe-1">
-                                                {{ parent.name }}
-                                            </span>
-                                            <span class="budget-amt-cell text-end text-body-2">
-                                                {{ fmt(parentSavingsBudgeted(parent, col)) }}
-                                            </span>
-                                            <span class="budget-amt-cell text-end text-body-2">
-                                                {{ fmt(parentSavingsActual(parent, col)) }}
-                                            </span>
-                                            <span
-                                                class="budget-amt-cell text-end text-body-2"
-                                                :class="savingsDiffClass(parentSavingsRemaining(parent, col))"
-                                            >{{ fmt(parentSavingsRemaining(parent, col)) }}</span>
-                                            <div class="budget-eye-cell d-flex justify-center">
-                                                <v-btn
-                                                    v-if="!hiddenCategoryIds.has(parent.id) && parentSavingsBudgeted(parent, col) === 0"
-                                                    density="compact"
-                                                    variant="text"
-                                                    size="x-small"
-                                                    class="budget-eye-btn"
-                                                    @click="onHideParent(parent)"
-                                                >
-                                                    <v-icon :icon="mdiEyeOff" size="16" />
-                                                    <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
-                                                </v-btn>
-                                            </div>
-                                        </div>
-
-                                        <template v-if="expandedParents.has(parent.id)">
-                                            <template v-for="sub in (parent.subCategories ?? [])" :key="sub.id">
-                                                <div
-                                                    v-if="isSavingsSubVisibleInCol(sub.id, col)"
-                                                    class="d-flex align-center budget-sub-row py-1 ps-6"
-                                                >
-                                                    <span class="budget-name-cell text-body-2 text-medium-emphasis text-truncate pe-1">
-                                                        {{ sub.name }}
-                                                    </span>
-                                                    <div class="budget-amt-cell d-flex justify-end align-center">
+                                                <template v-for="(col, colIdx) in threeMonthColumns" :key="`ss-${sub.id}-${col.year}-${col.month}`">
+                                                    <div class="budget-data-cell budget-sub-body budget-month-first" :class="{ 'budget-col-current-tint': colIdx === 1 }">
                                                         <v-text-field
                                                             v-if="isEditing(sub.id, col)"
                                                             v-model="editingText"
@@ -427,57 +382,35 @@
                                                             @click="startEdit(sub.id, col)"
                                                         >{{ fmt(subSavingsBudgeted(sub.id, col)) }}</span>
                                                     </div>
-                                                    <span class="budget-amt-cell text-end text-body-2">
-                                                        {{ fmt(subSavingsActual(sub.id, col)) }}
-                                                    </span>
-                                                    <span
-                                                        class="budget-amt-cell text-end text-body-2"
-                                                        :class="savingsDiffClass(subSavingsRemaining(sub.id, col))"
-                                                    >{{ fmt(subSavingsRemaining(sub.id, col)) }}</span>
-                                                    <div class="budget-eye-cell d-flex justify-center">
-                                                        <v-btn
-                                                            v-if="!hiddenCategoryIds.has(sub.id) && subSavingsBudgeted(sub.id, col) === 0"
-                                                            density="compact"
-                                                            variant="text"
-                                                            size="x-small"
-                                                            class="budget-eye-btn"
-                                                            @click="onHideSub(sub.id)"
-                                                        >
-                                                            <v-icon :icon="mdiEyeOff" size="16" />
-                                                            <v-tooltip activator="parent">{{ tt('Hide') }}</v-tooltip>
-                                                        </v-btn>
-                                                    </div>
-                                                </div>
+                                                    <div class="budget-data-cell budget-sub-body" :class="{ 'budget-col-current-tint': colIdx === 1 }">{{ fmt(subSavingsActual(sub.id, col)) }}</div>
+                                                    <div class="budget-data-cell budget-sub-body" :class="[{ 'budget-col-current-tint': colIdx === 1 }, savingsDiffClass(subSavingsRemaining(sub.id, col))]">{{ fmt(subSavingsRemaining(sub.id, col)) }}</div>
+                                                </template>
                                             </template>
                                         </template>
                                     </template>
                                 </template>
                             </template>
-
-                            <!-- Empty state -->
-                            <div
-                                v-if="!hasAnyData"
-                                class="d-flex align-center justify-center py-4"
-                            >
-                                <span class="text-body-2 text-medium-emphasis">
-                                    {{ tt('No categories available to add') }}
-                                </span>
-                            </div>
                         </template>
 
-                        <!-- Add Category button (center column only) -->
-                        <div v-if="colIdx === 1 && hasHiddenItems" class="mt-3">
-                            <v-btn
-                                variant="tonal"
-                                size="small"
-                                :prepend-icon="mdiPlus"
-                                @click="showAddCategoryDialog = true"
-                            >
-                                {{ tt('Add Category') }}
-                            </v-btn>
+                        <!-- Empty state -->
+                        <div v-if="!hasAnyData" class="budget-full-span d-flex align-center justify-center py-4">
+                            <span class="text-body-2 text-medium-emphasis">{{ tt('No categories available to add') }}</span>
                         </div>
-                    </v-card-text>
-                </v-card>
+                    </template>
+
+                    <!-- Add Category button -->
+                    <div v-if="hasHiddenItems" class="budget-full-span pa-3">
+                        <v-btn
+                            variant="tonal"
+                            size="small"
+                            :prepend-icon="mdiPlus"
+                            @click="showAddCategoryDialog = true"
+                        >
+                            {{ tt('Add Category') }}
+                        </v-btn>
+                    </div>
+
+                </div>
             </div>
         </v-col>
     </v-row>
@@ -485,7 +418,6 @@
     <!-- Copy Budget Dialog -->
     <v-dialog v-model="showCopyDialog" max-width="520" :persistent="copyLoading">
         <v-card :title="tt('Copy Budget')">
-            <!-- Step 1: source month picker -->
             <v-card-text v-if="copyStep === 1">
                 <div class="text-body-2 text-medium-emphasis mb-4">{{ tt('Select Source Month') }}</div>
                 <div class="d-flex gap-4">
@@ -510,7 +442,6 @@
                 </div>
             </v-card-text>
 
-            <!-- Step 2: conflict resolution -->
             <v-card-text v-else>
                 <div class="text-body-2 text-medium-emphasis mb-4">
                     {{ formatColumnTitle({ year: copySourceYear, month: copySourceMonth }) }}
@@ -523,12 +454,10 @@
                     :key="item.subcategoryId"
                     class="mb-4 pb-3 border-b"
                 >
-                    <!-- Category name prominent -->
                     <div class="text-subtitle-2 font-weight-bold mb-2">
                         {{ item.parentCategoryName }} › {{ item.subcategoryName }}
                     </div>
 
-                    <!-- Hidden, no existing target -->
                     <template v-if="item.isHidden && !item.hasExistingTarget">
                         <div class="text-body-2 text-medium-emphasis mb-2">
                             {{ tt('This category is hidden in the destination month.') }}
@@ -540,7 +469,6 @@
                         </v-radio-group>
                     </template>
 
-                    <!-- Visible, has existing target -->
                     <template v-else-if="!item.isHidden && item.hasExistingTarget">
                         <div class="text-body-2 text-medium-emphasis mb-2">
                             {{ tt('This category already has a budget in the destination month.') }}
@@ -553,7 +481,6 @@
                         </v-radio-group>
                     </template>
 
-                    <!-- Hidden AND has existing target -->
                     <template v-else>
                         <div class="text-body-2 text-medium-emphasis mb-2">
                             {{ tt('This category is hidden in the destination month.') }}
@@ -574,21 +501,9 @@
 
             <v-card-actions>
                 <v-spacer />
-                <v-btn :disabled="copyLoading" @click="showCopyDialog = false">
-                    {{ tt('Cancel') }}
-                </v-btn>
-                <v-btn
-                    v-if="copyStep === 1"
-                    color="primary"
-                    :loading="copyLoading"
-                    @click="advanceCopyStep"
-                >{{ tt('Next') }}</v-btn>
-                <v-btn
-                    v-else
-                    color="primary"
-                    :loading="copyLoading"
-                    @click="executeCopy"
-                >{{ tt('Confirm') }}</v-btn>
+                <v-btn :disabled="copyLoading" @click="showCopyDialog = false">{{ tt('Cancel') }}</v-btn>
+                <v-btn v-if="copyStep === 1" color="primary" :loading="copyLoading" @click="advanceCopyStep">{{ tt('Next') }}</v-btn>
+                <v-btn v-else color="primary" :loading="copyLoading" @click="executeCopy">{{ tt('Confirm') }}</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -597,94 +512,38 @@
     <v-dialog v-model="showAddCategoryDialog" max-width="420">
         <v-card :title="tt('Add Category')">
             <v-card-text>
-                <div
-                    v-if="!hasHiddenItems"
-                    class="text-body-2 text-medium-emphasis"
-                >
+                <div v-if="!hasHiddenItems" class="text-body-2 text-medium-emphasis">
                     {{ tt('No categories available to add') }}
                 </div>
                 <v-list v-else density="compact">
-                    <!-- Hidden income parent categories -->
                     <template v-for="parent in hiddenIncomeParents" :key="'ip-' + parent.id">
-                        <v-list-item
-                            :title="parent.name"
-                            :subtitle="tt('Income')"
-                            class="cursor-pointer"
-                            @click="onAddParent(parent)"
-                        >
-                            <template #prepend>
-                                <v-icon :icon="mdiPlus" size="18" class="me-1" />
-                            </template>
+                        <v-list-item :title="parent.name" :subtitle="tt('Income')" class="cursor-pointer" @click="onAddParent(parent)">
+                            <template #prepend><v-icon :icon="mdiPlus" size="18" class="me-1" /></template>
                         </v-list-item>
                     </template>
-
-                    <!-- Hidden income sub-categories (parent is visible) -->
                     <template v-for="item in hiddenIncomeSubsUnderVisibleParent" :key="'is-' + item.sub.id">
-                        <v-list-item
-                            :title="item.sub.name"
-                            :subtitle="item.parent.name + ' (' + tt('Income') + ')'"
-                            class="cursor-pointer"
-                            @click="onAddSub(item.sub.id)"
-                        >
-                            <template #prepend>
-                                <v-icon :icon="mdiPlus" size="18" class="me-1" />
-                            </template>
+                        <v-list-item :title="item.sub.name" :subtitle="item.parent.name + ' (' + tt('Income') + ')'" class="cursor-pointer" @click="onAddSub(item.sub.id)">
+                            <template #prepend><v-icon :icon="mdiPlus" size="18" class="me-1" /></template>
                         </v-list-item>
                     </template>
-
-                    <!-- Hidden expense parent categories -->
                     <template v-for="parent in hiddenExpenseParents" :key="'ep-' + parent.id">
-                        <v-list-item
-                            :title="parent.name"
-                            :subtitle="tt('Expenses')"
-                            class="cursor-pointer"
-                            @click="onAddParent(parent)"
-                        >
-                            <template #prepend>
-                                <v-icon :icon="mdiPlus" size="18" class="me-1" />
-                            </template>
+                        <v-list-item :title="parent.name" :subtitle="tt('Expenses')" class="cursor-pointer" @click="onAddParent(parent)">
+                            <template #prepend><v-icon :icon="mdiPlus" size="18" class="me-1" /></template>
                         </v-list-item>
                     </template>
-
-                    <!-- Hidden expense sub-categories (parent is visible) -->
                     <template v-for="item in hiddenExpenseSubsUnderVisibleParent" :key="'es-' + item.sub.id">
-                        <v-list-item
-                            :title="item.sub.name"
-                            :subtitle="item.parent.name + ' (' + tt('Expenses') + ')'"
-                            class="cursor-pointer"
-                            @click="onAddSub(item.sub.id)"
-                        >
-                            <template #prepend>
-                                <v-icon :icon="mdiPlus" size="18" class="me-1" />
-                            </template>
+                        <v-list-item :title="item.sub.name" :subtitle="item.parent.name + ' (' + tt('Expenses') + ')'" class="cursor-pointer" @click="onAddSub(item.sub.id)">
+                            <template #prepend><v-icon :icon="mdiPlus" size="18" class="me-1" /></template>
                         </v-list-item>
                     </template>
-
-                    <!-- Hidden savings parent categories -->
                     <template v-for="parent in hiddenSavingsParents" :key="'sp-' + parent.id">
-                        <v-list-item
-                            :title="parent.name"
-                            :subtitle="tt('Savings')"
-                            class="cursor-pointer"
-                            @click="onAddParent(parent)"
-                        >
-                            <template #prepend>
-                                <v-icon :icon="mdiPlus" size="18" class="me-1" />
-                            </template>
+                        <v-list-item :title="parent.name" :subtitle="tt('Savings')" class="cursor-pointer" @click="onAddParent(parent)">
+                            <template #prepend><v-icon :icon="mdiPlus" size="18" class="me-1" /></template>
                         </v-list-item>
                     </template>
-
-                    <!-- Hidden savings sub-categories (parent is visible) -->
                     <template v-for="item in hiddenSavingsSubsUnderVisibleParent" :key="'ss-' + item.sub.id">
-                        <v-list-item
-                            :title="item.sub.name"
-                            :subtitle="item.parent.name + ' (' + tt('Savings') + ')'"
-                            class="cursor-pointer"
-                            @click="onAddSub(item.sub.id)"
-                        >
-                            <template #prepend>
-                                <v-icon :icon="mdiPlus" size="18" class="me-1" />
-                            </template>
+                        <v-list-item :title="item.sub.name" :subtitle="item.parent.name + ' (' + tt('Savings') + ')'" class="cursor-pointer" @click="onAddSub(item.sub.id)">
+                            <template #prepend><v-icon :icon="mdiPlus" size="18" class="me-1" /></template>
                         </v-list-item>
                     </template>
                 </v-list>
@@ -954,7 +813,7 @@ function savingsDiffClass(diff: number): string {
     return '';
 }
 
-// ---------- Per-column visibility (change #4) ----------
+// ---------- Per-column visibility ----------
 
 function isSubVisibleInCol(subId: string, col: { year: number; month: number }): boolean {
     return !hiddenCategoryIds.value.has(subId) || subBudgeted(subId, col) > 0 || subActual(subId, col) > 0;
@@ -963,6 +822,55 @@ function isSubVisibleInCol(subId: string, col: { year: number; month: number }):
 function isParentVisibleInCol(parent: TransactionCategory, col: { year: number; month: number }): boolean {
     if (!hiddenCategoryIds.value.has(parent.id)) return true;
     return (parent.subCategories ?? []).some(sub => subBudgeted(sub.id, col) > 0 || subActual(sub.id, col) > 0);
+}
+
+function isSavingsSubVisibleInCol(subId: string, col: { year: number; month: number }): boolean {
+    return !hiddenCategoryIds.value.has(subId) || subSavingsBudgeted(subId, col) > 0 || subSavingsActual(subId, col) !== 0;
+}
+
+function isSavingsParentVisibleInCol(parent: TransactionCategory, col: { year: number; month: number }): boolean {
+    if (!hiddenCategoryIds.value.has(parent.id)) return true;
+    return (parent.subCategories ?? []).some(sub => subSavingsBudgeted(sub.id, col) > 0 || subSavingsActual(sub.id, col) !== 0);
+}
+
+// ---------- Cross-column visibility (shared row layout) ----------
+
+function isParentVisibleInAnyCol(parent: TransactionCategory): boolean {
+    return threeMonthColumns.value.some(col => isParentVisibleInCol(parent, col));
+}
+
+function isSubVisibleInAnyCol(subId: string): boolean {
+    return threeMonthColumns.value.some(col => isSubVisibleInCol(subId, col));
+}
+
+function isSavingsParentVisibleInAnyCol(parent: TransactionCategory): boolean {
+    return threeMonthColumns.value.some(col => isSavingsParentVisibleInCol(parent, col));
+}
+
+function isSavingsSubVisibleInAnyCol(subId: string): boolean {
+    return threeMonthColumns.value.some(col => isSavingsSubVisibleInCol(subId, col));
+}
+
+// ---------- Hide button eligibility (zero budget across all three months) ----------
+
+function parentCanHide(parent: TransactionCategory): boolean {
+    return !hiddenCategoryIds.value.has(parent.id)
+        && threeMonthColumns.value.every(col => parentBudgeted(parent, col) === 0);
+}
+
+function subCanHide(subId: string): boolean {
+    return !hiddenCategoryIds.value.has(subId)
+        && threeMonthColumns.value.every(col => subBudgeted(subId, col) === 0);
+}
+
+function savingsParentCanHide(parent: TransactionCategory): boolean {
+    return !hiddenCategoryIds.value.has(parent.id)
+        && threeMonthColumns.value.every(col => parentSavingsBudgeted(parent, col) === 0);
+}
+
+function savingsSubCanHide(subId: string): boolean {
+    return !hiddenCategoryIds.value.has(subId)
+        && threeMonthColumns.value.every(col => subSavingsBudgeted(subId, col) === 0);
 }
 
 // ---------- Amount calculations ----------
@@ -1017,43 +925,26 @@ function parentSavingsRemaining(parent: TransactionCategory, col: { year: number
     return parentSavingsBudgeted(parent, col) - parentSavingsActual(parent, col);
 }
 
-function isSavingsSubVisibleInCol(subId: string, col: { year: number; month: number }): boolean {
-    return !hiddenCategoryIds.value.has(subId) || subSavingsBudgeted(subId, col) > 0 || subSavingsActual(subId, col) !== 0;
-}
-
-function isSavingsParentVisibleInCol(parent: TransactionCategory, col: { year: number; month: number }): boolean {
-    if (!hiddenCategoryIds.value.has(parent.id)) return true;
-    return (parent.subCategories ?? []).some(sub => subSavingsBudgeted(sub.id, col) > 0 || subSavingsActual(sub.id, col) !== 0);
-}
-
-// ---------- Column summary totals (change #6) ----------
+// ---------- Column summary totals ----------
 
 function colIncomeBudgeted(col: { year: number; month: number }): number {
-    return allIncomeParents.value
-        .flatMap(p => p.subCategories ?? [])
-        .reduce((sum, sub) => sum + subBudgeted(sub.id, col), 0);
+    return allIncomeParents.value.flatMap(p => p.subCategories ?? []).reduce((sum, sub) => sum + subBudgeted(sub.id, col), 0);
 }
 
 function colIncomeActual(col: { year: number; month: number }): number {
-    return allIncomeParents.value
-        .flatMap(p => p.subCategories ?? [])
-        .reduce((sum, sub) => sum + subActual(sub.id, col), 0);
+    return allIncomeParents.value.flatMap(p => p.subCategories ?? []).reduce((sum, sub) => sum + subActual(sub.id, col), 0);
 }
 
 function colIncomeDiff(col: { year: number; month: number }): number {
-    return colIncomeBudgeted(col) - colIncomeActual(col);
+    return colIncomeActual(col) - colIncomeBudgeted(col);
 }
 
 function colExpenseBudgeted(col: { year: number; month: number }): number {
-    return allExpenseParents.value
-        .flatMap(p => p.subCategories ?? [])
-        .reduce((sum, sub) => sum + subBudgeted(sub.id, col), 0);
+    return allExpenseParents.value.flatMap(p => p.subCategories ?? []).reduce((sum, sub) => sum + subBudgeted(sub.id, col), 0);
 }
 
 function colExpenseActual(col: { year: number; month: number }): number {
-    return allExpenseParents.value
-        .flatMap(p => p.subCategories ?? [])
-        .reduce((sum, sub) => sum + subActual(sub.id, col), 0);
+    return allExpenseParents.value.flatMap(p => p.subCategories ?? []).reduce((sum, sub) => sum + subActual(sub.id, col), 0);
 }
 
 function colExpenseDiff(col: { year: number; month: number }): number {
@@ -1061,15 +952,11 @@ function colExpenseDiff(col: { year: number; month: number }): number {
 }
 
 function colSavingsBudgeted(col: { year: number; month: number }): number {
-    return allTransferParents.value
-        .flatMap(p => p.subCategories ?? [])
-        .reduce((sum, sub) => sum + subSavingsBudgeted(sub.id, col), 0);
+    return allTransferParents.value.flatMap(p => p.subCategories ?? []).reduce((sum, sub) => sum + subSavingsBudgeted(sub.id, col), 0);
 }
 
 function colSavingsActual(col: { year: number; month: number }): number {
-    return allTransferParents.value
-        .flatMap(p => p.subCategories ?? [])
-        .reduce((sum, sub) => sum + subSavingsActual(sub.id, col), 0);
+    return allTransferParents.value.flatMap(p => p.subCategories ?? []).reduce((sum, sub) => sum + subSavingsActual(sub.id, col), 0);
 }
 
 function colSavingsDiff(col: { year: number; month: number }): number {
@@ -1100,7 +987,7 @@ function toggleExpanded(parentId: string): void {
     expandedParents.value = next;
 }
 
-// ---------- Hide/show (change #2) ----------
+// ---------- Hide/show ----------
 
 function onHideParent(parent: TransactionCategory): void {
     const childIds = (parent.subCategories ?? []).map(s => s.id);
@@ -1331,6 +1218,7 @@ if (isUserLogined() && isUserUnlocked()) {
 </script>
 
 <style>
+/* ── Timeline ── */
 .budget-timeline-wrap {
     overflow-x: auto;
     width: 100%;
@@ -1370,77 +1258,219 @@ if (isUserLogined() && isUserUnlocked()) {
     filter: brightness(0.92);
 }
 
-.budget-columns-grid {
+/* ── Outer scroll wrapper ── */
+.budget-table-wrap {
+    overflow-x: auto;
+    width: 100%;
+    border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+    border-radius: 8px;
+}
+
+/* ── CSS grid: 1 name col + 9 data cols (3 months × 3 sub-cols) ── */
+.budget-table {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    grid-template-columns: minmax(180px, auto) repeat(9, minmax(90px, 1fr));
 }
 
-.budget-month-card {
-    min-width: 260px;
+/* ── Full-width spanning utility ── */
+.budget-full-span {
+    grid-column: span 10;
 }
 
-.budget-col-current {
-    border: 2px solid rgb(var(--v-theme-primary)) !important;
+/* ── Sticky name column (shared base for all name cells) ── */
+.budget-name-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: rgb(var(--v-theme-surface));
+    display: flex;
+    align-items: center;
+    overflow: hidden;
 }
 
-.budget-name-cell {
-    flex: 1;
-    min-width: 0;
+/* ── Header row 1: month titles ── */
+.budget-th {
+    background: rgb(var(--v-theme-surface));
+    font-size: 0.75rem;
+    color: rgba(var(--v-theme-on-surface), 0.6);
+    padding: 8px 8px 6px;
+    text-align: right;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
 }
 
-.budget-amt-cell {
-    width: 88px;
-    flex-shrink: 0;
+.budget-th-corner {
+    z-index: 3;
+    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
-.budget-eye-cell {
-    width: 32px;
-    flex-shrink: 0;
+.budget-month-header {
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgba(var(--v-theme-on-surface), 0.87);
+    padding: 12px 8px 10px;
+    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+    border-left: 2px solid rgba(var(--v-theme-on-surface), 0.2);
 }
 
-.budget-summary-name-cell {
-    flex: 1;
-    min-width: 0;
+/* Left border on every Budgeted (first) cell of each month group */
+.budget-month-first {
+    border-left: 2px solid rgba(var(--v-theme-on-surface), 0.2);
 }
 
-.budget-summary-section {
+.budget-month-header--current {
+    background-color: rgba(var(--v-theme-primary), 0.06);
+    border-bottom: 2px solid rgb(var(--v-theme-primary));
+    color: rgb(var(--v-theme-primary));
+}
+
+/* ── Header row 2: B / A / R labels ── */
+.budget-th-sub-corner {
+    z-index: 3;
+    border-bottom: 2px solid rgba(var(--v-theme-on-surface), 0.12);
+}
+
+.budget-th-sub {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: rgba(var(--v-theme-on-surface), 0.5);
+    padding: 4px 8px 6px;
+    border-bottom: 2px solid rgba(var(--v-theme-on-surface), 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    background: rgb(var(--v-theme-surface));
+}
+
+/* ── Current month column tint ── */
+.budget-col-current-tint {
+    background-color: rgba(var(--v-theme-primary), 0.04);
+}
+
+/* ── Summary section borders ── */
+.budget-summary-border-top {
+    border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+    height: 0;
+}
+
+.budget-summary-border-bottom {
+    border-bottom: 2px solid rgba(var(--v-theme-on-surface), 0.15);
+    height: 0;
+    margin-bottom: 4px;
+}
+
+/* ── Summary row cells ── */
+.budget-summary-name {
+    padding: 6px 8px 6px 6px;
+    background: rgba(var(--v-theme-on-surface), 0.03);
+    /* position sticky already from .budget-name-col */
+}
+
+/* Override sticky bg for summary name so tint is visible through solid bg */
+.budget-name-col.budget-summary-name {
+    background: color-mix(in srgb, rgb(var(--v-theme-surface)) 97%, currentColor 3%);
+}
+
+.budget-summary-cell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 6px 8px;
+    font-size: 0.8125rem;
     background-color: rgba(var(--v-theme-on-surface), 0.03);
-    border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
 }
 
-.budget-summary-row:hover {
-    background-color: rgba(var(--v-theme-on-surface), 0.04);
+.budget-summary-cell.budget-col-current-tint {
+    background-color: rgba(var(--v-theme-primary), 0.06);
 }
 
+/* ── Section labels ── */
 .budget-section-label {
     font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: rgba(var(--v-theme-on-surface), 0.45);
+    padding: 10px 8px 4px;
 }
 
-.budget-parent-row .budget-eye-btn {
-    opacity: 0;
-    transition: opacity 0.15s;
+/* ── Section divider (between Expenses/Income/Savings) ── */
+.budget-section-divider {
+    border-top: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+    margin: 8px 0;
+    height: 0;
 }
 
-.budget-parent-row:hover .budget-eye-btn {
-    opacity: 1;
+/* ── Parent category rows ── */
+.budget-parent-row {
+    padding: 2px 6px 2px 0;
+    min-height: 36px;
+    border-top: 1px solid rgba(var(--v-theme-on-surface), 0.07);
 }
 
+.budget-parent-body {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 4px 8px;
+    font-size: 0.8125rem;
+    min-height: 36px;
+    border-top: 1px solid rgba(var(--v-theme-on-surface), 0.07);
+}
+
+/* ── Sub-category rows ── */
+.budget-sub-row {
+    padding: 2px 6px 2px 36px;
+    min-height: 32px;
+}
+
+.budget-sub-body {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 3px 8px;
+    font-size: 0.8125rem;
+    min-height: 32px;
+}
+
+/* ── Name cell internals ── */
+.budget-row-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.budget-row-eye {
+    width: 28px;
+    min-width: 28px;
+    flex-shrink: 0;
+}
+
+.budget-expand-cell {
+    width: 32px;
+    min-width: 32px;
+    flex-shrink: 0;
+}
+
+/* ── Eye button: fade in on hover of its own name cell ── */
+.budget-parent-row .budget-eye-btn,
 .budget-sub-row .budget-eye-btn {
     opacity: 0;
     transition: opacity 0.15s;
 }
 
+.budget-parent-row:hover .budget-eye-btn,
 .budget-sub-row:hover .budget-eye-btn {
     opacity: 1;
 }
 
+/* ── Inline edit ── */
 .budget-edit-field {
-    width: 88px;
+    width: 82px;
 }
 
 .budget-budgeted-span {
