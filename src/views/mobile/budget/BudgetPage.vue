@@ -1165,9 +1165,12 @@ function onPageAfterIn(): void {
 }
 
 .budget-m-cat-header {
-    padding-top: 6px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--f7-page-bg-color);
+    padding-top: 14px;
     padding-bottom: 2px;
-    margin-top: 8px;
 }
 
 .budget-m-section-label {

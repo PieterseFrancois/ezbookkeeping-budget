@@ -15,6 +15,7 @@ import UnlockPage from '@/views/desktop/UnlockPage.vue';
 import HomePage from '@/views/desktop/HomePage.vue';
 
 import BudgetPage from '@/views/desktop/budget/BudgetPage.vue';
+import GoalsPage from '@/views/desktop/goals/GoalsPage.vue';
 
 import TransactionListPage from '@/views/desktop/transactions/ListPage.vue';
 
@@ -106,6 +107,11 @@ const router = createRouter({
                 {
                     path: '/budget',
                     component: BudgetPage,
+                    beforeEnter: checkLogin
+                },
+                {
+                    path: '/goals',
+                    component: GoalsPage,
                     beforeEnter: checkLogin
                 },
                 {

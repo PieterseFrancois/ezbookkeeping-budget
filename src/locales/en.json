@@ -2694,5 +2694,18 @@
     "Savings": "Savings",
     "Savings & Investments": "Savings & Investments",
     "Net Contribution": "Net Contribution",
-    "Withdrawal": "Withdrawal"
+    "Withdrawal": "Withdrawal",
+    "Goals": "Goals",
+    "Goal Name": "Goal Name",
+    "Add Goal": "Add Goal",
+    "Edit Goal": "Edit Goal",
+    "Delete Goal": "Delete Goal",
+    "Goal Reached": "Goal Reached",
+    "Overdue": "Overdue",
+    "Target Amount": "Target Amount",
+    "Target Date": "Target Date",
+    "Suggested Monthly Contribution": "Suggested Monthly Contribution",
+    "No goals yet. Add your first goal to get started.": "No goals yet. Add your first goal to get started.",
+    "Future: auto-link contribution to budget": "Future: auto-link contribution to budget",
+    "Are you sure you want to delete this goal?": "Are you sure you want to delete this goal?"
 }

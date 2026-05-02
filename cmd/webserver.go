@@ -468,6 +468,12 @@ func startWebServer(c *core.CliContext) error {
 			apiV1Route.POST("/budget/targets/delete.json", bindApi(api.Budget.DeleteBudgetTargetHandler))
 			apiV1Route.GET("/budget/savings-actuals.json", bindApi(api.Budget.SavingsActualsHandler))
 
+			// Goals
+			apiV1Route.GET("/goals/list.json", bindApi(api.Goal.GoalsHandler))
+			apiV1Route.POST("/goals/add.json", bindApi(api.Goal.CreateGoalHandler))
+			apiV1Route.POST("/goals/modify.json", bindApi(api.Goal.UpdateGoalHandler))
+			apiV1Route.POST("/goals/delete.json", bindApi(api.Goal.DeleteGoalHandler))
+
 			// Large Language Models
 			if config.ReceiptImageRecognitionLLMConfig != nil && config.ReceiptImageRecognitionLLMConfig.LLMProvider != "" {
 				if config.TransactionFromAIImageRecognition {

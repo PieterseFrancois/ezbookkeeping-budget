@@ -1261,6 +1261,9 @@ if (isUserLogined() && isUserUnlocked()) {
 /* ── Outer scroll wrapper ── */
 .budget-table-wrap {
     overflow-x: auto;
+    overflow-y: auto;
+    height: calc(100vh - 200px);
+    min-height: 320px;
     width: 100%;
     border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
     border-radius: 8px;
@@ -1290,6 +1293,9 @@ if (isUserLogined() && isUserUnlocked()) {
 
 /* ── Header row 1: month titles ── */
 .budget-th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
     background: rgb(var(--v-theme-surface));
     font-size: 0.75rem;
     color: rgba(var(--v-theme-on-surface), 0.6);
@@ -1301,7 +1307,7 @@ if (isUserLogined() && isUserUnlocked()) {
 }
 
 .budget-th-corner {
-    z-index: 3;
+    z-index: 4;
     border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
@@ -1321,18 +1327,22 @@ if (isUserLogined() && isUserUnlocked()) {
 }
 
 .budget-month-header--current {
-    background-color: rgba(var(--v-theme-primary), 0.06);
+    background-color: color-mix(in srgb, rgb(var(--v-theme-surface)) 94%, rgb(var(--v-theme-primary)) 6%);
     border-bottom: 2px solid rgb(var(--v-theme-primary));
     color: rgb(var(--v-theme-primary));
 }
 
 /* ── Header row 2: B / A / R labels ── */
 .budget-th-sub-corner {
-    z-index: 3;
+    top: 40px;
+    z-index: 4;
     border-bottom: 2px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .budget-th-sub {
+    position: sticky;
+    top: 40px;
+    z-index: 3;
     font-size: 0.72rem;
     font-weight: 500;
     color: rgba(var(--v-theme-on-surface), 0.5);
@@ -1347,6 +1357,11 @@ if (isUserLogined() && isUserUnlocked()) {
 /* ── Current month column tint ── */
 .budget-col-current-tint {
     background-color: rgba(var(--v-theme-primary), 0.04);
+}
+
+/* Sticky header cells must have an opaque background */
+.budget-th-sub.budget-col-current-tint {
+    background-color: color-mix(in srgb, rgb(var(--v-theme-surface)) 96%, rgb(var(--v-theme-primary)) 4%);
 }
 
 /* ── Summary section borders ── */

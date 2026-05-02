@@ -182,6 +182,10 @@
                 <f7-icon f7="chart_pie"></f7-icon>
                 <span class="tabbar-label">{{ tt('Statistics') }}</span>
             </f7-link>
+            <f7-link class="link" href="/goals">
+                <f7-icon f7="flag_2"></f7-icon>
+                <span class="tabbar-label">{{ tt('Goals') }}</span>
+            </f7-link>
             <f7-link class="link" href="/settings">
                 <f7-icon f7="gear_alt"></f7-icon>
                 <span class="tabbar-label">{{ tt('Settings') }}</span>
