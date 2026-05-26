@@ -29,8 +29,9 @@ var (
 	}
 )
 
-// GetSavingsActuals returns actual transfer amounts grouped by category for the given user, year and month
-func (s *BudgetService) GetSavingsActuals(c core.Context, uid int64, year int, month int, categoryIds []int64) ([]*models.SavingsCategoryActual, error) {
+// GetSavingsActuals returns actual transfer amounts grouped by category for the given user, year and month.
+// endDay controls the budget cycle boundary (0 = calendar month).
+func (s *BudgetService) GetSavingsActuals(c core.Context, uid int64, year int, month int, endDay int, categoryIds []int64) ([]*models.SavingsCategoryActual, error) {
 	if uid <= 0 {
 		return nil, errs.ErrUserIdInvalid
 	}
@@ -39,7 +40,7 @@ func (s *BudgetService) GetSavingsActuals(c core.Context, uid int64, year int, m
 		return []*models.SavingsCategoryActual{}, nil
 	}
 
-	minTransactionTime, maxTransactionTime, err := utils.GetTransactionTimeRangeByYearMonth(int32(year), int32(month))
+	minTransactionTime, maxTransactionTime, err := utils.GetTransactionTimeRangeByYearMonth(int32(year), int32(month), endDay)
 
 	if err != nil {
 		return nil, errs.ErrSystemError

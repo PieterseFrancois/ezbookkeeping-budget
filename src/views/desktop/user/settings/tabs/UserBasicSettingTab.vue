@@ -153,6 +153,19 @@
                                     v-model="newProfile.fiscalYearStart"
                                 />
                             </v-col>
+
+                            <v-col cols="12" md="6">
+                                <v-select
+                                    item-title="label"
+                                    item-value="value"
+                                    persistent-placeholder
+                                    :disabled="loading || saving"
+                                    :label="tt('Budget Cycle End Day')"
+                                    :placeholder="tt('Budget Cycle End Day')"
+                                    :items="budgetEndDayOptions"
+                                    v-model="newProfile.budgetEndDay"
+                                />
+                            </v-col>
                         </v-row>
                     </v-card-text>
 
@@ -468,6 +481,13 @@ const {
 const rootStore = useRootStore();
 const userStore = useUserStore();
 const accountsStore = useAccountsStore();
+
+const budgetEndDayOptions = [
+    { label: tt('End of month'), value: 0 },
+    { label: tt('15th'), value: 15 },
+    { label: tt('25th'), value: 25 },
+    { label: tt('28th'), value: 28 }
+];
 
 const confirmDialog = useTemplateRef<ConfirmDialogType>('confirmDialog');
 const snackbar = useTemplateRef<SnackBarType>('snackbar');

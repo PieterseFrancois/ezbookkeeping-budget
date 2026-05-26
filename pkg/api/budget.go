@@ -12,6 +12,7 @@ import (
 type BudgetApi struct {
 	budgetTargets         *services.BudgetService
 	transactionCategories *services.TransactionCategoryService
+	users                 *services.UserService
 }
 
 // Initialize a budget api singleton instance
@@ -19,6 +20,7 @@ var (
 	Budget = &BudgetApi{
 		budgetTargets:         services.BudgetTargets,
 		transactionCategories: services.TransactionCategories,
+		users:                 services.Users,
 	}
 )
 
@@ -33,6 +35,14 @@ func (a *BudgetApi) SavingsActualsHandler(c *core.WebContext) (any, *errs.Error)
 	}
 
 	uid := c.GetCurrentUid()
+
+	user, err := a.users.GetUserById(c, uid)
+
+	if err != nil {
+		log.Errorf(c, "[budget.SavingsActualsHandler] failed to get user \"uid:%d\", because %s", uid, err.Error())
+		return nil, errs.Or(err, errs.ErrUserNotFound)
+	}
+
 	allCategories, err := a.transactionCategories.GetAllCategoriesByUid(c, uid, models.CATEGORY_TYPE_TRANSFER, -1)
 
 	if err != nil {
@@ -48,7 +58,7 @@ func (a *BudgetApi) SavingsActualsHandler(c *core.WebContext) (any, *errs.Error)
 		}
 	}
 
-	items, err := a.budgetTargets.GetSavingsActuals(c, uid, req.Year, req.Month, categoryIds)
+	items, err := a.budgetTargets.GetSavingsActuals(c, uid, req.Year, req.Month, int(user.BudgetEndDay), categoryIds)
 
 	if err != nil {
 		log.Errorf(c, "[budget.SavingsActualsHandler] failed to get savings actuals for user \"uid:%d\", because %s", uid, err.Error())

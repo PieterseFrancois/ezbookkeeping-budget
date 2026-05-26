@@ -118,6 +118,7 @@ export function useUserProfilePageBase() {
             newProfile.value.language === oldProfile.value.language &&
             newProfile.value.defaultCurrency === oldProfile.value.defaultCurrency &&
             newProfile.value.fiscalYearStart === oldProfile.value.fiscalYearStart &&
+            newProfile.value.budgetEndDay === oldProfile.value.budgetEndDay &&
             newProfile.value.firstDayOfWeek === oldProfile.value.firstDayOfWeek &&
             newProfile.value.calendarDisplayType === oldProfile.value.calendarDisplayType &&
             newProfile.value.dateDisplayType === oldProfile.value.dateDisplayType &&

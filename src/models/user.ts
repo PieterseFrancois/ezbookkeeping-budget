@@ -21,6 +21,7 @@ export class User {
     public defaultAccountId: string = EMPTY_USER_BASIC_INFO.defaultAccountId;
     public transactionEditScope: number = EMPTY_USER_BASIC_INFO.transactionEditScope;
     public fiscalYearStart: number = EMPTY_USER_BASIC_INFO.fiscalYearStart;
+    public budgetEndDay: number = EMPTY_USER_BASIC_INFO.budgetEndDay;
     public calendarDisplayType: number = EMPTY_USER_BASIC_INFO.calendarDisplayType;
     public dateDisplayType: number = EMPTY_USER_BASIC_INFO.dateDisplayType;
     public longDateFormat: number = EMPTY_USER_BASIC_INFO.longDateFormat;
@@ -53,6 +54,7 @@ export class User {
         this.defaultCurrency = user.defaultCurrency;
         this.firstDayOfWeek = user.firstDayOfWeek;
         this.fiscalYearStart = user.fiscalYearStart;
+        this.budgetEndDay = user.budgetEndDay;
         this.calendarDisplayType = user.calendarDisplayType;
         this.dateDisplayType = user.dateDisplayType;
         this.longDateFormat = user.longDateFormat;
@@ -95,6 +97,7 @@ export class User {
             defaultCurrency: this.defaultCurrency,
             firstDayOfWeek: this.firstDayOfWeek,
             fiscalYearStart: this.fiscalYearStart,
+            budgetEndDay: this.budgetEndDay,
             calendarDisplayType: this.calendarDisplayType,
             dateDisplayType: this.dateDisplayType,
             longDateFormat: this.longDateFormat,
@@ -118,6 +121,7 @@ export class User {
         user.defaultAccountId = userInfo.defaultAccountId;
         user.transactionEditScope = userInfo.transactionEditScope;
         user.fiscalYearStart = userInfo.fiscalYearStart;
+        user.budgetEndDay = userInfo.budgetEndDay;
         user.calendarDisplayType = userInfo.calendarDisplayType;
         user.dateDisplayType = userInfo.dateDisplayType;
         user.longDateFormat = userInfo.longDateFormat;
@@ -154,6 +158,7 @@ export interface UserBasicInfo {
     readonly defaultCurrency: string;
     readonly firstDayOfWeek: number;
     readonly fiscalYearStart: number;
+    readonly budgetEndDay: number;
     readonly calendarDisplayType: number;
     readonly dateDisplayType: number;
     readonly longDateFormat: number;
@@ -210,6 +215,7 @@ export interface UserProfileUpdateRequest {
     readonly defaultCurrency?: string;
     readonly firstDayOfWeek?: number;
     readonly fiscalYearStart?: number;
+    readonly budgetEndDay?: number;
     readonly calendarDisplayType?: number;
     readonly dateDisplayType?: number;
     readonly longDateFormat?: number;
@@ -249,6 +255,7 @@ export const EMPTY_USER_BASIC_INFO: UserBasicInfo = {
     defaultCurrency: '',
     firstDayOfWeek: -1,
     fiscalYearStart: FiscalYearStart.Default.value,
+    budgetEndDay: 0,
     calendarDisplayType: CalendarDisplayType.Default.type,
     dateDisplayType: DateDisplayType.Default.type,
     longDateFormat: LongDateFormat.Default.type,

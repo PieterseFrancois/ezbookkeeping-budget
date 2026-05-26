@@ -361,6 +361,15 @@ func (a *UsersApi) UserUpdateProfileHandler(c *core.WebContext) (any, *errs.Erro
 		userNew.FiscalYearStart = core.FISCAL_YEAR_START_INVALID
 	}
 
+	if userUpdateReq.BudgetEndDay != nil && *userUpdateReq.BudgetEndDay != user.BudgetEndDay {
+		user.BudgetEndDay = *userUpdateReq.BudgetEndDay
+		userNew.BudgetEndDay = *userUpdateReq.BudgetEndDay
+		modifyProfileBasicInfo = true
+		anythingUpdate = true
+	} else {
+		userNew.BudgetEndDay = core.BUDGET_END_DAY_INVALID
+	}
+
 	if userUpdateReq.CalendarDisplayType != nil && *userUpdateReq.CalendarDisplayType != user.CalendarDisplayType {
 		user.CalendarDisplayType = *userUpdateReq.CalendarDisplayType
 		userNew.CalendarDisplayType = *userUpdateReq.CalendarDisplayType

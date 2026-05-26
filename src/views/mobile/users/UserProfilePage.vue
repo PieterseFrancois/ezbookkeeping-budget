@@ -221,6 +221,22 @@
                 </fiscal-year-start-selection-sheet>
             </f7-list-item>
 
+            <f7-list-item
+                link="#"
+                class="list-item-with-header-and-title list-item-no-item-after"
+                :header="tt('Budget Cycle End Day')"
+                :title="budgetEndDayOptions.find(o => o.value === newProfile.budgetEndDay)?.label ?? tt('End of month')"
+                @click="showBudgetEndDayPopup = true"
+            >
+                <list-item-selection-popup value-type="item"
+                                           key-field="value" value-field="value"
+                                           title-field="label"
+                                           :title="tt('Budget Cycle End Day')"
+                                           :items="budgetEndDayOptions"
+                                           v-model:show="showBudgetEndDayPopup"
+                                           v-model="newProfile.budgetEndDay">
+                </list-item-selection-popup>
+            </f7-list-item>
         </f7-list>
 
         <f7-list form strong inset dividers class="margin-vertical" v-if="!loading">
@@ -638,6 +654,13 @@ const rootStore = useRootStore();
 const userStore = useUserStore();
 const accountsStore = useAccountsStore();
 
+const budgetEndDayOptions = [
+    { label: tt('End of month'), value: 0 },
+    { label: tt('15th'), value: 15 },
+    { label: tt('25th'), value: 25 },
+    { label: tt('28th'), value: 28 }
+];
+
 const currentPassword = ref<string>('');
 const currentNoPassword = ref<boolean>(false);
 const loadingError = ref<unknown | null>(null);
@@ -648,6 +671,7 @@ const showLanguagePopup = ref<boolean>(false);
 const showDefaultCurrencyPopup = ref<boolean>(false);
 const showFirstDayOfWeekPopup = ref<boolean>(false);
 const showFiscalYearStartSheet = ref<boolean>(false);
+const showBudgetEndDayPopup = ref<boolean>(false);
 const showCalendarDisplayTypePopup = ref<boolean>(false);
 const showDateDisplayTypePopup = ref<boolean>(false);
 const showLongDateFormatPopup = ref<boolean>(false);

@@ -95,6 +95,7 @@ type User struct {
 	DefaultCurrency       string                     `xorm:"VARCHAR(3) NOT NULL"`
 	FirstDayOfWeek        core.WeekDay               `xorm:"TINYINT NOT NULL"`
 	FiscalYearStart       core.FiscalYearStart       `xorm:"SMALLINT"`
+	BudgetEndDay          core.BudgetEndDay          `xorm:"TINYINT"`
 	CalendarDisplayType   core.CalendarDisplayType   `xorm:"TINYINT"`
 	DateDisplayType       core.DateDisplayType       `xorm:"TINYINT"`
 	LongDateFormat        core.LongDateFormat        `xorm:"TINYINT"`
@@ -133,6 +134,7 @@ type UserBasicInfo struct {
 	DefaultCurrency       string                     `json:"defaultCurrency"`
 	FirstDayOfWeek        core.WeekDay               `json:"firstDayOfWeek"`
 	FiscalYearStart       core.FiscalYearStart       `json:"fiscalYearStart"`
+	BudgetEndDay          core.BudgetEndDay          `json:"budgetEndDay"`
 	CalendarDisplayType   core.CalendarDisplayType   `json:"calendarDisplayType"`
 	DateDisplayType       core.DateDisplayType       `json:"dateDisplayType"`
 	LongDateFormat        core.LongDateFormat        `json:"longDateFormat"`
@@ -199,6 +201,7 @@ type UserProfileUpdateRequest struct {
 	DefaultCurrency       string                      `json:"defaultCurrency" binding:"omitempty,len=3,validCurrency"`
 	FirstDayOfWeek        *core.WeekDay               `json:"firstDayOfWeek" binding:"omitempty,min=0,max=6"`
 	FiscalYearStart       *core.FiscalYearStart       `json:"fiscalYearStart" binding:"omitempty,validFiscalYearStart"`
+	BudgetEndDay          *core.BudgetEndDay          `json:"budgetEndDay" binding:"omitempty,validBudgetEndDay"`
 	CalendarDisplayType   *core.CalendarDisplayType   `json:"calendarDisplayType" binding:"omitempty,min=0,max=4"`
 	DateDisplayType       *core.DateDisplayType       `json:"dateDisplayType" binding:"omitempty,min=0,max=3"`
 	LongDateFormat        *core.LongDateFormat        `json:"longDateFormat" binding:"omitempty,min=0,max=3"`
@@ -278,6 +281,12 @@ func (u *User) ToUserBasicInfo(avatarProvider core.UserAvatarProviderType, avata
 		fiscalYearStart = core.FISCAL_YEAR_START_DEFAULT
 	}
 
+	budgetEndDay := u.BudgetEndDay
+
+	if !core.IsValidBudgetEndDay(budgetEndDay) {
+		budgetEndDay = core.BUDGET_END_DAY_DEFAULT
+	}
+
 	return &UserBasicInfo{
 		Username:              u.Username,
 		Email:                 u.Email,
@@ -290,6 +299,7 @@ func (u *User) ToUserBasicInfo(avatarProvider core.UserAvatarProviderType, avata
 		DefaultCurrency:       u.DefaultCurrency,
 		FirstDayOfWeek:        u.FirstDayOfWeek,
 		FiscalYearStart:       fiscalYearStart,
+		BudgetEndDay:          budgetEndDay,
 		CalendarDisplayType:   u.CalendarDisplayType,
 		DateDisplayType:       u.DateDisplayType,
 		LongDateFormat:        u.LongDateFormat,

@@ -76,6 +76,11 @@ export const useUserStore = defineStore('user', () => {
         return isNumber(userInfo.fiscalYearStart) && FiscalYearStart.valueOf(userInfo.fiscalYearStart) ? userInfo.fiscalYearStart : EMPTY_USER_BASIC_INFO.fiscalYearStart;
     });
 
+    const currentUserBudgetEndDay = computed<number>(() => {
+        const userInfo = currentUserBasicInfo.value || EMPTY_USER_BASIC_INFO;
+        return isNumber(userInfo.budgetEndDay) ? userInfo.budgetEndDay : 0;
+    });
+
     const currentUserCalendarDisplayType = computed<number>(() => {
         const userInfo = currentUserBasicInfo.value || EMPTY_USER_BASIC_INFO;
         return userInfo.calendarDisplayType;
@@ -445,6 +450,7 @@ export const useUserStore = defineStore('user', () => {
         currentUserDefaultCurrency,
         currentUserFirstDayOfWeek,
         currentUserFiscalYearStart,
+        currentUserBudgetEndDay,
         currentUserCalendarDisplayType,
         currentUserDateDisplayType,
         currentUserLongDateFormat,

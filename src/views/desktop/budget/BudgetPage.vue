@@ -25,6 +25,11 @@
             </div>
         </v-col>
 
+        <!-- Budget cycle note -->
+        <v-col cols="12" class="pb-0 pt-1" v-if="budgetCycleNote">
+            <span class="text-caption text-medium-emphasis">{{ budgetCycleNote }}</span>
+        </v-col>
+
         <!-- Budget table -->
         <v-col cols="12" class="pt-3">
             <div class="budget-table-wrap">
@@ -619,6 +624,16 @@ const userStore = useUserStore();
 
 const defaultCurrency = computed<string>(() => userStore.currentUserDefaultCurrency);
 
+const budgetCycleNote = computed<string>(() => {
+    const endDay = userStore.currentUserBudgetEndDay;
+    if (!endDay) return '';
+    const { month: prevMonth } = addMonths(selectedYear.value, selectedMonth.value, -1);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const startLabel = `${endDay + 1} ${monthNames[prevMonth - 1]}`;
+    const endLabel = `${endDay} ${monthNames[selectedMonth.value - 1]}`;
+    return `Budget cycle: ${startLabel} – ${endLabel}`;
+});
+
 // ---------- UI state ----------
 
 const loading = ref<boolean>(true);
@@ -777,6 +792,22 @@ function monthFirstUnixTime(year: number, month: number): number {
 
 function monthLastUnixTime(year: number, month: number): number {
     return Math.floor(new Date(year, month, 1, 0, 0, 0, 0).getTime() / 1000) - 1;
+}
+
+// Cycle-aware boundaries — used for the statistics query only.
+// When endDay > 0, "May" covers (endDay+1) Apr to endDay May.
+function cycleFirstUnixTime(year: number, month: number): number {
+    const endDay = userStore.currentUserBudgetEndDay;
+    if (!endDay) return monthFirstUnixTime(year, month);
+    const { year: prevYear, month: prevMonth } = addMonths(year, month, -1);
+    return Math.floor(new Date(prevYear, prevMonth - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000);
+}
+
+function cycleLastUnixTime(year: number, month: number): number {
+    const endDay = userStore.currentUserBudgetEndDay;
+    if (!endDay) return monthLastUnixTime(year, month);
+    // end of endDay (exclusive start of endDay+1)
+    return Math.floor(new Date(year, month - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000) - 1;
 }
 
 function formatColumnTitle(col: { year: number; month: number }): string {
@@ -1048,8 +1079,8 @@ function cancelEdit(): void {
 
 async function loadStatsForMonth(year: number, month: number): Promise<void> {
     const resp = await services.getTransactionStatistics({
-        startTime: monthFirstUnixTime(year, month),
-        endTime: monthLastUnixTime(year, month),
+        startTime: cycleFirstUnixTime(year, month),
+        endTime: cycleLastUnixTime(year, month),
         tagFilter: '',
         keyword: '',
         useTransactionTimezone: false,

@@ -403,19 +403,42 @@ func GetUnixTimeFromTransactionTime(transactionTime int64) int64 {
 	return transactionTime / 1000
 }
 
-// GetTransactionTimeRangeByYearMonth returns the transaction time range by specified year and month
-func GetTransactionTimeRangeByYearMonth(year int32, month int32) (int64, int64, error) {
-	startMinUnixTime, err := ParseFromLongDateTimeToMinUnixTime(fmt.Sprintf("%d-%02d-01 00:00:00", year, month))
-	startMaxUnixTime, err := ParseFromLongDateTimeToMaxUnixTime(fmt.Sprintf("%d-%02d-01 00:00:00", year, month))
+// GetTransactionTimeRangeByYearMonth returns the transaction time range by specified year and month.
+// endDay controls the budget cycle boundary: 0 means the calendar month (1st–last day),
+// otherwise the period runs from (endDay+1) of the previous month to endDay of the current month.
+func GetTransactionTimeRangeByYearMonth(year int32, month int32, endDay int) (int64, int64, error) {
+	if endDay <= 0 {
+		startMinUnixTime, err := ParseFromLongDateTimeToMinUnixTime(fmt.Sprintf("%d-%02d-01 00:00:00", year, month))
+		startMaxUnixTime, err := ParseFromLongDateTimeToMaxUnixTime(fmt.Sprintf("%d-%02d-01 00:00:00", year, month))
 
-	if err != nil {
-		return 0, 0, err
+		if err != nil {
+			return 0, 0, err
+		}
+
+		endMaxUnixTime := startMaxUnixTime.AddDate(0, 1, 0)
+
+		minTransactionTime := GetMinTransactionTimeFromUnixTime(startMinUnixTime.Unix())
+		maxTransactionTime := GetMinTransactionTimeFromUnixTime(endMaxUnixTime.Unix()) - 1
+
+		return minTransactionTime, maxTransactionTime, nil
 	}
 
-	endMaxUnixTime := startMaxUnixTime.AddDate(0, 1, 0)
+	// Custom cycle: period starts on (endDay+1) of the previous month and ends on endDay of the current month.
+	// time.Date normalises overflow (e.g. Feb 29 → Mar 1 in non-leap years) automatically.
+	prevYear, prevMonth := int(year), int(month)-1
+	if prevMonth == 0 {
+		prevMonth = 12
+		prevYear--
+	}
 
-	minTransactionTime := GetMinTransactionTimeFromUnixTime(startMinUnixTime.Unix())
-	maxTransactionTime := GetMinTransactionTimeFromUnixTime(endMaxUnixTime.Unix()) - 1
+	easternmostTZ := time.FixedZone("Timezone", easternmostTimezoneUtcOffset*60)
+	westernmostTZ := time.FixedZone("Timezone", westernmostTimezoneUtcOffset*60)
+
+	startMinTime := time.Date(prevYear, time.Month(prevMonth), endDay+1, 0, 0, 0, 0, easternmostTZ)
+	endMaxTime := time.Date(int(year), time.Month(month), endDay+1, 0, 0, 0, 0, westernmostTZ)
+
+	minTransactionTime := GetMinTransactionTimeFromUnixTime(startMinTime.Unix())
+	maxTransactionTime := GetMinTransactionTimeFromUnixTime(endMaxTime.Unix()) - 1
 
 	return minTransactionTime, maxTransactionTime, nil
 }

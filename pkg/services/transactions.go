@@ -383,7 +383,7 @@ func (s *TransactionService) GetTransactionsInMonthByPage(c core.Context, uid in
 		}
 	}
 
-	minTransactionTime, maxTransactionTime, err := utils.GetTransactionTimeRangeByYearMonth(year, month)
+	minTransactionTime, maxTransactionTime, err := utils.GetTransactionTimeRangeByYearMonth(year, month, 0)
 
 	if err != nil {
 		return nil, errs.ErrSystemError
@@ -2287,7 +2287,7 @@ func (s *TransactionService) GetAccountsAndCategoriesMonthlyInflowAndOutflow(c c
 	var err error
 
 	if startYear > 0 && startMonth > 0 {
-		startTransactionTime, _, err = utils.GetTransactionTimeRangeByYearMonth(startYear, startMonth)
+		startTransactionTime, _, err = utils.GetTransactionTimeRangeByYearMonth(startYear, startMonth, 0)
 
 		if err != nil {
 			return nil, errs.ErrSystemError
@@ -2295,7 +2295,7 @@ func (s *TransactionService) GetAccountsAndCategoriesMonthlyInflowAndOutflow(c c
 	}
 
 	if endYear > 0 && endMonth > 0 {
-		_, endTransactionTime, err = utils.GetTransactionTimeRangeByYearMonth(endYear, endMonth)
+		_, endTransactionTime, err = utils.GetTransactionTimeRangeByYearMonth(endYear, endMonth, 0)
 
 		if err != nil {
 			return nil, errs.ErrSystemError

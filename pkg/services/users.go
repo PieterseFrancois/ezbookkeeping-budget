@@ -297,6 +297,10 @@ func (s *UserService) UpdateUser(c core.Context, user *models.User, modifyUserLa
 		updateCols = append(updateCols, "fiscal_year_start")
 	}
 
+	if core.IsValidBudgetEndDay(user.BudgetEndDay) {
+		updateCols = append(updateCols, "budget_end_day")
+	}
+
 	if core.CALENDAR_DISPLAY_TYPE_DEFAULT <= user.CalendarDisplayType && user.CalendarDisplayType <= core.CALENDAR_DISPLAY_TYPE_GREGORAIN_WITH_PERSIAN {
 		updateCols = append(updateCols, "calendar_display_type")
 	}

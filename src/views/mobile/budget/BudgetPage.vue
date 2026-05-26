@@ -22,6 +22,9 @@
             </div>
         </div>
 
+        <!-- Budget cycle note -->
+        <div v-if="budgetCycleNote" class="budget-m-cycle-note">{{ budgetCycleNote }}</div>
+
         <!-- Summary card -->
         <f7-card class="budget-m-summary-card">
             <f7-card-content :padding="false">
@@ -519,6 +522,16 @@ const defaultCurrency = computed<string>(() => userStore.currentUserDefaultCurre
 
 const col = computed(() => ({ year: selectedYear.value, month: selectedMonth.value }));
 
+const budgetCycleNote = computed<string>(() => {
+    const endDay = userStore.currentUserBudgetEndDay;
+    if (!endDay) return '';
+    const { month: prevMonth } = addMonths(selectedYear.value, selectedMonth.value, -1);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const startLabel = `${endDay + 1} ${monthNames[prevMonth - 1]}`;
+    const endLabel = `${endDay} ${monthNames[selectedMonth.value - 1]}`;
+    return `Budget cycle: ${startLabel} – ${endLabel}`;
+});
+
 // ---------- UI state ----------
 
 const loading = ref<boolean>(true);
@@ -679,6 +692,19 @@ function monthFirstUnixTime(year: number, month: number): number {
 
 function monthLastUnixTime(year: number, month: number): number {
     return Math.floor(new Date(year, month, 1, 0, 0, 0, 0).getTime() / 1000) - 1;
+}
+
+function cycleFirstUnixTime(year: number, month: number): number {
+    const endDay = userStore.currentUserBudgetEndDay;
+    if (!endDay) return monthFirstUnixTime(year, month);
+    const { year: prevYear, month: prevMonth } = addMonths(year, month, -1);
+    return Math.floor(new Date(prevYear, prevMonth - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000);
+}
+
+function cycleLastUnixTime(year: number, month: number): number {
+    const endDay = userStore.currentUserBudgetEndDay;
+    if (!endDay) return monthLastUnixTime(year, month);
+    return Math.floor(new Date(year, month - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000) - 1;
 }
 
 function formatMonthTitle(year: number, month: number): string {
@@ -881,8 +907,8 @@ watch(showNumPad, async (isOpen) => {
 
 async function loadStatsForMonth(year: number, month: number): Promise<void> {
     const resp = await services.getTransactionStatistics({
-        startTime: monthFirstUnixTime(year, month),
-        endTime: monthLastUnixTime(year, month),
+        startTime: cycleFirstUnixTime(year, month),
+        endTime: cycleLastUnixTime(year, month),
         tagFilter: '',
         keyword: '',
         useTransactionTimezone: false,
@@ -1060,6 +1086,12 @@ function onPageAfterIn(): void {
 </script>
 
 <style>
+.budget-m-cycle-note {
+    font-size: 12px;
+    color: var(--f7-list-item-subtitle-text-color, #888);
+    padding: 2px 16px 6px;
+}
+
 .budget-m-timeline-wrap {
     overflow-x: auto;
     padding: 8px 16px;

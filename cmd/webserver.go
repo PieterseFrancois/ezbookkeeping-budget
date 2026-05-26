@@ -118,6 +118,7 @@ func startWebServer(c *core.CliContext) error {
 		_ = v.RegisterValidation("validAmountFilter", validators.ValidAmountFilter)
 		_ = v.RegisterValidation("validTagFilter", validators.ValidTagFilter)
 		_ = v.RegisterValidation("validFiscalYearStart", validators.ValidateFiscalYearStart)
+		_ = v.RegisterValidation("validBudgetEndDay", validators.ValidateBudgetEndDay)
 	}
 
 	router.NoRoute(bindApi(api.Default.ApiNotFound))
