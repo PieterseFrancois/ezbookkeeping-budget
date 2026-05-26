@@ -3,7 +3,7 @@ import { TransactionType } from '@/core/transaction.ts';
 import { Account } from '@/models/account.ts';
 import { TransactionCategory } from '@/models/transaction_category.ts';
 import { TransactionTag } from '@/models/transaction_tag.ts';
-import { TransactionPicture } from '@/models/transaction_picture_info.ts';
+import { TransactionPicture, type TransactionPictureInfoBasicResponse } from '@/models/transaction_picture_info.ts';
 import { Transaction } from '@/models/transaction.ts';
 
 import {
@@ -30,6 +30,16 @@ export interface SetTransactionOptions {
     destinationAmount?: number;
     tagIds?: string;
     comment?: string;
+}
+
+export function* allTransactionPictures(transactions: Transaction[]): Iterable<[Transaction, TransactionPictureInfoBasicResponse]> {
+    for (const transaction of transactions) {
+        if (transaction.pictures) {
+            for (const pictureInfo of transaction.pictures) {
+                yield [transaction, pictureInfo];
+            }
+        }
+    }
 }
 
 export function setTransactionModelByTransaction(transaction: Transaction, transaction2: Transaction | null | undefined, allCategories: Record<number, TransactionCategory[]>, allCategoriesMap: Record<string, TransactionCategory>, allVisibleAccounts: Account[], allAccountsMap: Record<string, Account>, allTagsMap: Record<string, TransactionTag>, defaultAccountId: string, options: SetTransactionOptions, setContextData: boolean): void {

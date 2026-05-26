@@ -80,10 +80,10 @@
         </f7-block>
 
         <div class="skeleton-text" v-if="loading">
-            <f7-block class="combination-list-wrapper margin-vertical" :class="{ 'no-accordion-toggle': pageType !== TransactionListPageType.List.type }"
+            <f7-block class="combination-list-wrapper margin-vertical" :class="{ 'no-accordion-toggle': pageType !== TransactionListPageType.List.type && pageType !== TransactionListPageType.Gallery.type }"
                       :key="blockIdx" v-for="blockIdx in (pageType === TransactionListPageType.List.type ? [ 1, 2 ] : [ 1 ])">
                 <f7-accordion-item>
-                    <f7-block-title v-if="pageType === TransactionListPageType.List.type">
+                    <f7-block-title v-if="pageType === TransactionListPageType.List.type || pageType === TransactionListPageType.Gallery.type">
                         <f7-accordion-toggle>
                             <f7-list strong inset dividers media-list
                                      class="transaction-amount-list combination-list-header combination-list-opened">
@@ -101,7 +101,8 @@
                         </f7-accordion-toggle>
                     </f7-block-title>
                     <f7-accordion-content style="height: auto">
-                        <f7-list strong inset dividers media-list accordion-list class="transaction-info-list combination-list-content">
+                        <f7-list strong inset dividers media-list accordion-list class="transaction-info-list combination-list-content"
+                                 v-if="pageType === TransactionListPageType.List.type || pageType === TransactionListPageType.Calendar.type">
                             <f7-list-item link="#" chevron-center class="transaction-info"
                                           :key="itemIdx" v-for="itemIdx in (pageType === TransactionListPageType.List.type && blockIdx === 1 ? [ 1, 2, 3, 4, 5, 6, 7 ] : [ 1, 2, 3 ])">
                                 <template #media>
@@ -147,6 +148,21 @@
                                 </template>
                             </f7-list-item>
                         </f7-list>
+                        <f7-list strong inset dividers media-list accordion-list class="transaction-info-list combination-list-content transaction-gallery-list"
+                                 v-if="pageType === TransactionListPageType.Gallery.type">
+                            <f7-list-item class="transaction-gallery-container">
+                                <template #default>
+                                    <div class="transaction-gallery-grid">
+                                        <div class="transaction-picture-cell"
+                                             :key="itemIdx" v-for="itemIdx in [ 1, 2, 3, 4, 5 ]">
+                                            <div class="display-flex justify-content-center align-items-center" style="height: 100%">
+                                                <f7-skeleton-block class="transaction-picture-img" style="width: 40px; height: 40px; border-radius: 50%" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </f7-list-item>
+                        </f7-list>
                     </f7-accordion-content>
                 </f7-accordion-item>
             </f7-block>
@@ -156,14 +172,14 @@
             <f7-list-item :title="tt('No transaction data')"></f7-list-item>
         </f7-list>
 
-        <f7-block class="combination-list-wrapper margin-vertical" :class="{ 'no-accordion-toggle': pageType !== TransactionListPageType.List.type }"
+        <f7-block class="combination-list-wrapper margin-vertical" :class="{ 'no-accordion-toggle': pageType !== TransactionListPageType.List.type && pageType !== TransactionListPageType.Gallery.type }"
                   :key="transactionMonthList.yearDashMonth" v-for="(transactionMonthList) in transactions">
             <f7-accordion-item :opened="transactionMonthList.opened"
                                @accordion:open="collapseTransactionMonthList(transactionMonthList, false)"
                                @accordion:opened="onTransactionMonthListCollapseStateChanged"
                                @accordion:close="collapseTransactionMonthList(transactionMonthList, true)"
                                @accordion:closed="onTransactionMonthListCollapseStateChanged">
-                <f7-block-title :id="getTransactionMonthTitleDomId(transactionMonthList.yearDashMonth)" v-if="pageType === TransactionListPageType.List.type">
+                <f7-block-title :id="getTransactionMonthTitleDomId(transactionMonthList.yearDashMonth)" v-if="pageType === TransactionListPageType.List.type || pageType === TransactionListPageType.Gallery.type">
                     <f7-accordion-toggle>
                         <f7-list strong inset dividers media-list
                                  class="transaction-amount-list combination-list-header"
@@ -193,7 +209,7 @@
                     <f7-list strong inset dividers media-list accordion-list
                              class="transaction-info-list transaction-month-list combination-list-content"
                              :id="getTransactionMonthListDomId(transactionMonthList.yearDashMonth)"
-                             v-if="!isTransactionMonthListInvisible(transactionMonthList)"
+                             v-if="!isTransactionMonthListInvisible(transactionMonthList) && (pageType === TransactionListPageType.List.type || pageType === TransactionListPageType.Calendar.type)"
                     >
                         <f7-list-item swipeout chevron-center accordion-item
                                       class="transaction-info"
@@ -293,12 +309,33 @@
                             </f7-swipeout-actions>
                         </f7-list-item>
                     </f7-list>
+                    <f7-list strong inset dividers media-list accordion-list
+                             class="transaction-info-list transaction-month-list combination-list-content transaction-gallery-list"
+                             :id="getTransactionMonthListDomId(transactionMonthList.yearDashMonth)"
+                             v-if="!isTransactionMonthListInvisible(transactionMonthList) && (pageType === TransactionListPageType.Gallery.type)">
+                        <f7-list-item class="transaction-gallery-container">
+                            <template #default>
+                                <div class="transaction-gallery-grid">
+                                    <div class="transaction-picture-cell" :key="pictureInfo.pictureId"
+                                         v-for="[transaction, pictureInfo] in allTransactionPictures(transactionMonthList.items)">
+                                        <image-box class="transaction-picture-img" alt="picture"
+                                                   :link="`/transaction/detail?id=${transaction.id}&type=${transaction.type}`"
+                                                   :src="getTransactionPictureUrl(pictureInfo)">
+                                            <template #error>
+                                                {{ tt('Failed to load image, please check whether the config "domain" and "root_url" are set correctly.') }}
+                                            </template>
+                                        </image-box>
+                                    </div>
+                                </div>
+                            </template>
+                        </f7-list-item>
+                    </f7-list>
                 </f7-accordion-content>
             </f7-accordion-item>
         </f7-block>
 
         <f7-block class="text-align-center" :class="{ 'disabled': loadingMore }" v-show="!loading && hasMoreTransaction"
-                  v-if="pageType === TransactionListPageType.List.type">
+                  v-if="pageType === TransactionListPageType.List.type || pageType === TransactionListPageType.Gallery.type">
             <f7-link href="#" @click="loadMore(false)">{{ tt('Load More') }}</f7-link>
         </f7-block>
 
@@ -309,7 +346,7 @@
                               :class="{ 'list-item-selected': query.dateType === dateRange.type }"
                               :key="dateRange.type"
                               v-for="dateRange in allDateRanges"
-                              v-show="pageType === TransactionListPageType.List.type || dateRange.type === DateRange.ThisMonth.type || dateRange.type === DateRange.LastMonth.type || dateRange.type === DateRange.Custom.type"
+                              v-show="pageType === TransactionListPageType.List.type || pageType === TransactionListPageType.Gallery.type || dateRange.type === DateRange.ThisMonth.type || dateRange.type === DateRange.LastMonth.type || dateRange.type === DateRange.Custom.type"
                               @click="changeDateFilter(dateRange.type)">
                     <template #after>
                         <f7-icon class="list-item-checked-icon" f7="checkmark_alt" v-if="query.dateType === dateRange.type"></f7-icon>
@@ -653,6 +690,7 @@ import {
     getDateTypeByBillingCycleDateRange,
     getDateRangeByDateType,
     getDateRangeByBillingCycleDateType,
+    getDateRangeByLastReconciledTimeRangeDateType,
     getFullMonthDateRange,
     getValidMonthDayOrCurrentDayShortDate
 } from '@/lib/datetime.ts';
@@ -660,6 +698,7 @@ import {
     categoryTypeToTransactionType,
     transactionTypeToCategoryType
 } from '@/lib/category.ts';
+import { allTransactionPictures } from '@/lib/transaction.ts';
 
 const props = defineProps<{
     f7route: Router.Route;
@@ -726,6 +765,7 @@ const {
     getDisplayAmount,
     getDisplayMonthTotalAmount,
     getTransactionTypeName,
+    getTransactionPictureUrl
 } = useTransactionListPageBase();
 
 const environmentsStore = useEnvironmentsStore();
@@ -752,7 +792,7 @@ const transactions = computed<TransactionMonthList[]>(() => {
         return [];
     }
 
-    if (pageType.value === TransactionListPageType.List.type) {
+    if (pageType.value === TransactionListPageType.List.type || pageType.value === TransactionListPageType.Gallery.type) {
         return transactionsStore.transactions;
     } else if (pageType.value === TransactionListPageType.Calendar.type) {
         if (queryMonthlyData.value) {
@@ -795,7 +835,7 @@ const transactions = computed<TransactionMonthList[]>(() => {
 });
 
 const noTransaction = computed<boolean>(() => {
-    if (pageType.value === TransactionListPageType.List.type) {
+    if (pageType.value === TransactionListPageType.List.type || pageType.value === TransactionListPageType.Gallery.type) {
         return transactionsStore.noTransaction;
     } else if (pageType.value === TransactionListPageType.Calendar.type) {
         return !transactions.value || !transactions.value.length || !transactions.value[0]!.items || !transactions.value[0]!.items.length;
@@ -931,7 +971,7 @@ function init(): void {
     let dateRange: TimeRangeAndDateType | null = getDateRangeByDateType(initQuery['dateType'] ? parseInt(initQuery['dateType']) : undefined, firstDayOfWeek.value, fiscalYearStart.value);
 
     if (!dateRange && initQuery['dateType'] && initQuery['maxTime'] && initQuery['minTime'] &&
-        (DateRange.isBillingCycle(parseInt(initQuery['dateType'])) || initQuery['dateType'] === DateRange.Custom.type.toString()) &&
+        (DateRange.isBillingCycle(parseInt(initQuery['dateType'])) || DateRange.isLastReconciledTimeRange(parseInt(initQuery['dateType'])) || initQuery['dateType'] === DateRange.Custom.type.toString()) &&
         parseInt(initQuery['maxTime']) > 0 && parseInt(initQuery['minTime']) > 0) {
         dateRange = {
             dateType: parseInt(initQuery['dateType']),
@@ -961,6 +1001,8 @@ function reload(done?: () => void): void {
         loading.value = true;
     }
 
+    const isGalleryMode = pageType.value === TransactionListPageType.Gallery.type;
+
     transactionInvisibleYearMonths.value = {};
     transactionYearMonthListHeights.value = {};
 
@@ -977,12 +1019,16 @@ function reload(done?: () => void): void {
             return transactionsStore.loadMonthlyAllTransactions({
                 year: currentYear,
                 month: currentMonth,
+                mustHavePictures: isGalleryMode,
+                withPictures: isGalleryMode,
                 autoExpand: true,
                 defaultCurrency: defaultCurrency.value
             });
         } else {
             return transactionsStore.loadTransactions({
                 reload: true,
+                mustHavePictures: isGalleryMode,
+                withPictures: isGalleryMode,
                 autoExpand: true,
                 defaultCurrency: defaultCurrency.value
             });
@@ -1022,10 +1068,14 @@ function loadMore(autoExpand: boolean): void {
         return;
     }
 
+    const isGalleryMode = pageType.value === TransactionListPageType.Gallery.type;
+
     loadingMore.value = true;
 
     transactionsStore.loadTransactions({
         reload: false,
+        mustHavePictures: isGalleryMode,
+        withPictures: isGalleryMode,
         autoExpand: autoExpand,
         defaultCurrency: defaultCurrency.value
     }).then(() => {
@@ -1059,6 +1109,8 @@ function changePageType(type: number): void {
                 reload();
             }
         }
+    } else {
+        reload();
     }
 }
 
@@ -1087,6 +1139,8 @@ function changeDateFilter(dateType: number): void {
 
     if (DateRange.isBillingCycle(dateType)) {
         dateRange = getDateRangeByBillingCycleDateType(dateType, firstDayOfWeek.value, fiscalYearStart.value, accountsStore.getAccountStatementDate(query.value.accountIds));
+    } else if (DateRange.isLastReconciledTimeRange(dateType)) {
+        dateRange = getDateRangeByLastReconciledTimeRangeDateType(dateType, allAccountsMap.value[query.value.accountIds]?.lastReconciledTime);
     } else {
         dateRange = getDateRangeByDateType(dateType, firstDayOfWeek.value, fiscalYearStart.value);
     }
@@ -1698,5 +1752,84 @@ html[dir="rtl"] .list.transaction-info-list li.transaction-info .transaction-foo
 
 .transaction-calendar-container .dp__main .dp__calendar .dp__calendar_row > .dp__calendar_item .transaction-calendar-daily-amounts > span.transaction-calendar-daily-amount {
     font-size: var(--ebk-transaction-calendar-amount-font-size);
+}
+
+.transaction-gallery-list.list > ul {
+    overflow: hidden;
+}
+
+.transaction-gallery-list.list > ul::before,
+.transaction-gallery-list.list > ul::after {
+    display: none;
+}
+
+.transaction-gallery-container > .item-content {
+    padding: 0;
+}
+
+.transaction-gallery-container > .item-content > .item-inner {
+    padding: 0;
+    min-height: 0;
+}
+
+.transaction-gallery-container > .item-content > .item-inner::after {
+    display: none;
+}
+
+.transaction-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    width: 100%;
+}
+
+@media (min-width: 480px) {
+    .transaction-gallery-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (min-width: 640px) {
+    .transaction-gallery-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+@media (min-width: 800px) {
+    .transaction-gallery-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+}
+
+@media (min-width: 960px) {
+    .transaction-gallery-grid {
+        grid-template-columns: repeat(7, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .transaction-gallery-grid {
+        grid-template-columns: repeat(8, 1fr);
+    }
+}
+
+@media (min-width: 1280px) {
+    .transaction-gallery-grid {
+        grid-template-columns: repeat(9, 1fr);
+    }
+}
+
+.transaction-picture-cell {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background-color: var(--f7-list-bg-color);
+}
+
+.transaction-picture-img {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 </style>

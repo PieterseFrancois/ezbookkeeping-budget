@@ -24,10 +24,10 @@ export function useStatisticsSettingPageBase() {
     const allTimezoneTypesUsedForStatistics = computed<TypeAndDisplayName[]>(() => getAllTimezoneTypesUsedForStatistics());
     const allSortingTypes = computed<TypeAndDisplayName[]>(() => getAllStatisticsSortingTypes());
     const allCategoricalChartTypes = computed<TypeAndDisplayName[]>(() => getAllCategoricalChartTypes());
-    const allCategoricalChartDateRanges = computed<LocalizedDateRange[]>(() => getAllDateRanges(DateRangeScene.Normal, false));
+    const allCategoricalChartDateRanges = computed<LocalizedDateRange[]>(() => getAllDateRanges(DateRangeScene.Normal, {}));
     const allTrendChartTypes = computed<TypeAndDisplayName[]>(() => getAllTrendChartTypes());
-    const allTrendChartDateRanges = computed<LocalizedDateRange[]>(() => getAllDateRanges(DateRangeScene.TrendAnalysis, false));
-    const allAssetTrendsChartDateRanges = computed<LocalizedDateRange[]>(() => getAllDateRanges(DateRangeScene.AssetTrends, false));
+    const allTrendChartDateRanges = computed<LocalizedDateRange[]>(() => getAllDateRanges(DateRangeScene.TrendAnalysis, {}));
+    const allAssetTrendsChartDateRanges = computed<LocalizedDateRange[]>(() => getAllDateRanges(DateRangeScene.AssetTrends, {}));
 
     const defaultChartDataType = computed<number>({
         get: () => settingsStore.appSettings.statistics.defaultChartDataType,

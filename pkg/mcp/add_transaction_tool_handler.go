@@ -178,7 +178,7 @@ func (h *mcpAddTransactionToolHandler) Handle(c *core.WebContext, callToolReq *M
 		return nil, nil, err
 	}
 
-	transactionEditable := user.CanEditTransactionByTransactionTime(transaction.TransactionTime, time.FixedZone("Transaction Timezone", int(transaction.TimezoneUtcOffset)*60))
+	transactionEditable := user.CanEditTransactionByTransactionTime(transaction.TransactionTime, time.FixedZone("Transaction Timezone", int(transaction.TimezoneUtcOffset)*60), sourceAccount, destinationAccount)
 
 	if !transactionEditable {
 		return nil, nil, errs.ErrCannotCreateTransactionWithThisTransactionTime

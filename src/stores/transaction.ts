@@ -746,6 +746,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
             if (DateRange.isBillingCycle(transactionsFilter.value.dateType) &&
                 (!accountsStore.getAccountStatementDate(filter.accountIds) || accountsStore.getAccountStatementDate(filter.accountIds) !== accountsStore.getAccountStatementDate(transactionsFilter.value.accountIds))) {
                 transactionsFilter.value.dateType = DateRange.Custom.type;
+            } else if (DateRange.isLastReconciledTimeRange(transactionsFilter.value.dateType) &&
+                (!accountsStore.allAccountsMap[filter.accountIds] || accountsStore.allAccountsMap[filter.accountIds]?.lastReconciledTime !== accountsStore.allAccountsMap[transactionsFilter.value.accountIds]?.lastReconciledTime)) {
+                transactionsFilter.value.dateType = DateRange.Custom.type;
             }
 
             transactionsFilter.value.accountIds = filter.accountIds;
@@ -793,7 +796,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
         querys.push('dateType=' + transactionsFilter.value.dateType);
 
-        if (DateRange.isBillingCycle(transactionsFilter.value.dateType) || transactionsFilter.value.dateType === DateRange.Custom.type) {
+        if (DateRange.isBillingCycle(transactionsFilter.value.dateType)
+            || DateRange.isLastReconciledTimeRange(transactionsFilter.value.dateType)
+            || transactionsFilter.value.dateType === DateRange.Custom.type) {
             querys.push('maxTime=' + transactionsFilter.value.maxTime);
             querys.push('minTime=' + transactionsFilter.value.minTime);
         }
@@ -822,7 +827,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
         };
     }
 
-    function loadTransactions({ reload, count, page, withCount, autoExpand, defaultCurrency }: { reload?: boolean, count?: number, page?: number, withCount?: boolean, autoExpand: boolean, defaultCurrency: string }): Promise<TransactionPageWrapper> {
+    function loadTransactions({ reload, count, page, mustHavePictures, withCount, withPictures, autoExpand, defaultCurrency }: { reload?: boolean, count?: number, page?: number, mustHavePictures?: boolean, withCount?: boolean, withPictures?: boolean, autoExpand: boolean, defaultCurrency: string }): Promise<TransactionPageWrapper> {
         let actualMaxTime = transactionsNextTimeId.value;
 
         if (reload && transactionsFilter.value.maxTime > 0) {
@@ -838,6 +843,8 @@ export const useTransactionsStore = defineStore('transactions', () => {
                 count: count || 50,
                 page: page || 1,
                 withCount: !!withCount,
+                withPictures: !!withPictures,
+                mustHavePictures: !!mustHavePictures,
                 type: transactionsFilter.value.type,
                 categoryIds: transactionsFilter.value.categoryIds,
                 accountIds: transactionsFilter.value.accountIds,
@@ -912,7 +919,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
         });
     }
 
-    function loadMonthlyAllTransactions({ year, month, autoExpand, defaultCurrency }: { year: number, month: number, autoExpand: boolean, defaultCurrency: string }): Promise<TransactionPageWrapper> {
+    function loadMonthlyAllTransactions({ year, month, mustHavePictures, withPictures, autoExpand, defaultCurrency }: { year: number, month: number, mustHavePictures?: boolean, withPictures?: boolean, autoExpand: boolean, defaultCurrency: string }): Promise<TransactionPageWrapper> {
         return new Promise((resolve, reject) => {
             services.getAllTransactionsByMonth({
                 year: year,
@@ -922,7 +929,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
                 accountIds: transactionsFilter.value.accountIds,
                 tagFilter: transactionsFilter.value.tagFilter,
                 amountFilter: transactionsFilter.value.amountFilter,
-                keyword: transactionsFilter.value.keyword
+                keyword: transactionsFilter.value.keyword,
+                mustHavePictures: !!mustHavePictures,
+                withPictures: !!withPictures
             }).then(response => {
                 const data = response.data;
 

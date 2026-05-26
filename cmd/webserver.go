@@ -376,6 +376,7 @@ func startWebServer(c *core.CliContext) error {
 			apiV1Route.GET("/accounts/get.json", bindApi(api.Accounts.AccountGetHandler))
 			apiV1Route.POST("/accounts/add.json", bindApi(api.Accounts.AccountCreateHandler))
 			apiV1Route.POST("/accounts/modify.json", bindApi(api.Accounts.AccountModifyHandler))
+			apiV1Route.POST("/accounts/update/last_reconciled_time.json", bindApi(api.Accounts.AccountUpdateLastReconciledTimeHandler))
 			apiV1Route.POST("/accounts/hide.json", bindApi(api.Accounts.AccountHideHandler))
 			apiV1Route.POST("/accounts/move.json", bindApi(api.Accounts.AccountMoveHandler))
 			apiV1Route.POST("/accounts/delete.json", bindApi(api.Accounts.AccountDeleteHandler))

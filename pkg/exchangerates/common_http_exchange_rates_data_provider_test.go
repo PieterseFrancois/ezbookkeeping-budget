@@ -24,7 +24,7 @@ func TestExchangeRatesApiLatestExchangeRateHandler_BankOfCanadaDataSource(t *tes
 	assert.Equal(t, "CAD", exchangeRateResponse.BaseCurrency)
 
 	supportedCurrencyCodes := []string{"AUD", "BRL", "CHF", "CNY", "EUR", "GBP", "HKD", "IDR", "INR",
-		"JPY", "KRW", "MXN", "MYR", "NOK", "NZD", "PEN", "RUB", "SAR", "SEK", "SGD", "THB", "TRY", "TWD",
+		"JPY", "KRW", "MXN", "MYR", "NOK", "NZD", "PEN", "PLN", "RUB", "SAR", "SEK", "SGD", "THB", "TRY", "TWD",
 		"USD", "VND", "ZAR"}
 
 	checkExchangeRatesHaveSpecifiedCurrencies(t, exchangeRateResponse.BaseCurrency, supportedCurrencyCodes, exchangeRateResponse.ExchangeRates)
@@ -131,6 +131,22 @@ func TestExchangeRatesApiLatestExchangeRateHandler_BankOfIsraelDataSource(t *tes
 
 	supportedCurrencyCodes := []string{"AUD", "CAD", "CHF", "DKK", "EGP", "EUR", "GBP",
 		"JOD", "JPY", "LBP", "NOK", "SEK", "USD", "ZAR"}
+
+	checkExchangeRatesHaveSpecifiedCurrencies(t, exchangeRateResponse.BaseCurrency, supportedCurrencyCodes, exchangeRateResponse.ExchangeRates)
+}
+
+func TestExchangeRatesApiLatestExchangeRateHandler_NationalBankOfKazakhstan(t *testing.T) {
+	exchangeRateResponse := executeLatestExchangeRateHandler(t, settings.NationalBankOfKazakhstanDataSource)
+
+	if exchangeRateResponse == nil {
+		return
+	}
+
+	assert.Equal(t, "KZT", exchangeRateResponse.BaseCurrency)
+
+	supportedCurrencyCodes := []string{"AED", "AMD", "AUD", "AZN", "BRL", "BYN", "CAD", "CHF", "CNY", "CZK",
+		"DKK", "EUR", "GBP", "GEL", "HKD", "HUF", "INR", "IRR", "JPY", "KGS", "KRW", "KWD", "MDL", "MXN",
+		"MYR", "NOK", "PLN", "RUB", "SAR", "SEK", "SGD", "THB", "TJS", "TRY", "UAH", "USD", "UZS", "ZAR"}
 
 	checkExchangeRatesHaveSpecifiedCurrencies(t, exchangeRateResponse.BaseCurrency, supportedCurrencyCodes, exchangeRateResponse.ExchangeRates)
 }

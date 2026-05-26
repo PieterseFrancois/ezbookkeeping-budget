@@ -27,6 +27,7 @@ import { replaceAll } from '@/lib/common.ts';
 import {
     getUtcOffsetByUtcOffsetMinutes,
     getTimezoneOffsetMinutes,
+    getCurrentUnixTime,
     parseDateTimeFromUnixTime,
     parseDateTimeFromUnixTimeWithTimezoneOffset
 } from '@/lib/datetime.ts';
@@ -53,6 +54,7 @@ export function useReconciliationStatementPageBase() {
     const accountId = ref<string>('');
     const startTime = ref<number>(0);
     const endTime = ref<number>(0);
+    const pageOpenTime = ref<number>(getCurrentUnixTime());
     const reconciliationStatements = ref<TransactionReconciliationStatementResponseWithInfo | undefined>(undefined);
     const chartDataDateAggregationType = ref<number>(ChartDateAggregationType.Day.type);
     const timezoneUsedForDateRange = ref<number>(TimezoneTypeForStatistics.ApplicationTimezone.type);
@@ -61,6 +63,7 @@ export function useReconciliationStatementPageBase() {
     const firstDayOfWeek = computed<WeekDayValue>(() => userStore.currentUserFirstDayOfWeek);
     const fiscalYearStart = computed<number>(() => userStore.currentUserFiscalYearStart);
     const defaultCurrency = computed<string>(() => userStore.currentUserDefaultCurrency);
+    const useLastReconciledTime = computed(() => userStore.currentUserUseLastReconciledTime);
 
     const allChartTypes = computed<TypeAndDisplayName[]>(() => getAllAccountBalanceTrendChartTypes());
     const allDateAggregationTypes = computed<TypeAndDisplayName[]>(() => getAllStatisticsDateAggregationTypesWithShortName(StatisticsAnalysisType.AssetTrends, !!currentAccountStatementDate.value));
@@ -69,7 +72,22 @@ export function useReconciliationStatementPageBase() {
     const currentAccount = computed(() => allAccountsMap.value[accountId.value]);
     const currentAccountCurrency = computed<string>(() => currentAccount.value?.currency ?? defaultCurrency.value);
     const currentAccountStatementDate = computed<number | undefined>(() => accountsStore.getAccountStatementDate(accountId.value) || undefined);
+    const currentAccountLastReconciledTime = computed<number | undefined>(() => currentAccount.value?.lastReconciledTime);
     const isCurrentLiabilityAccount = computed<boolean>(() => currentAccount.value?.isLiability ?? false);
+
+    const newLastReconciledTime = computed<number | undefined>(() => {
+        if (!currentAccount.value || !useLastReconciledTime.value) {
+            return undefined;
+        }
+
+        const actualEndTime: number = endTime.value === 0 ? pageOpenTime.value : Math.min(endTime.value, pageOpenTime.value);
+
+        if (!currentAccountLastReconciledTime.value || actualEndTime > currentAccountLastReconciledTime.value) {
+            return actualEndTime;
+        } else {
+            return undefined;
+        }
+    });
 
     const exportFileName = computed<string>(() => {
         const nickname = userStore.currentUserNickname;
@@ -123,6 +141,10 @@ export function useReconciliationStatementPageBase() {
             return formatAmountToLocalizedNumeralsWithCurrency(reconciliationStatements?.value?.closingBalance ?? 0, currentAccountCurrency.value);
         }
     });
+
+    function updatePageOpenTime() {
+        pageOpenTime.value = getCurrentUnixTime();
+    }
 
     function setReconciliationStatements(response: TransactionReconciliationStatementResponse | undefined) {
         if (!response) {
@@ -305,13 +327,16 @@ export function useReconciliationStatementPageBase() {
         firstDayOfWeek,
         fiscalYearStart,
         defaultCurrency,
+        useLastReconciledTime,
         allChartTypes,
         allDateAggregationTypes,
         allTimezoneTypesUsedForDateRange,
         currentAccount,
         currentAccountCurrency,
         currentAccountStatementDate,
+        currentAccountLastReconciledTime,
         isCurrentLiabilityAccount,
+        newLastReconciledTime,
         exportFileName,
         displayStartDateTime,
         displayEndDateTime,
@@ -321,6 +346,7 @@ export function useReconciliationStatementPageBase() {
         displayOpeningBalance,
         displayClosingBalance,
         // functions
+        updatePageOpenTime,
         setReconciliationStatements,
         getDisplayTransactionType,
         getDisplayDateTime,

@@ -18,55 +18,57 @@
             </f7-popover>
 
             <div class="numpad-buttons">
-                <f7-button class="numpad-button numpad-button-num" @click="inputNum(7)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputNum(7)">
                     <span class="numpad-button-text numpad-button-text-normal">{{ digits[7] }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" @click="inputNum(8)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputNum(8)">
                     <span class="numpad-button-text numpad-button-text-normal">{{ digits[8] }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" @click="inputNum(9)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputNum(9)">
                     <span class="numpad-button-text numpad-button-text-normal">{{ digits[9] }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-function no-right-border" @click="setSymbol('×')">
+                <f7-button class="numpad-button numpad-button-function no-right-border" @pointerup="setSymbol('×')">
                     <span class="numpad-button-text numpad-button-text-normal">&times;</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" @click="inputNum(4)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputNum(4)">
                     <span class="numpad-button-text numpad-button-text-normal">{{ digits[4] }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" @click="inputNum(5)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputNum(5)">
                     <span class="numpad-button-text numpad-button-text-normal">{{ digits[5] }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" @click="inputNum(6)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputNum(6)">
                     <span class="numpad-button-text numpad-button-text-normal">{{ digits[6] }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-function no-right-border" @click="setSymbol('−')">
+                <f7-button class="numpad-button numpad-button-function no-right-border" @pointerup="setSymbol('−')">
                     <span class="numpad-button-text numpad-button-text-normal">&minus;</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" @click="inputNum(1)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputNum(1)">
                     <span class="numpad-button-text numpad-button-text-normal">{{ digits[1] }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" @click="inputNum(2)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputNum(2)">
                     <span class="numpad-button-text numpad-button-text-normal">{{ digits[2] }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" @click="inputNum(3)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputNum(3)">
                     <span class="numpad-button-text numpad-button-text-normal">{{ digits[3] }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-function no-right-border" @click="setSymbol('+')">
+                <f7-button class="numpad-button numpad-button-function no-right-border" @pointerup="setSymbol('+')">
                     <span class="numpad-button-text numpad-button-text-normal">&plus;</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" v-if="supportDecimalSeparator" @click="inputDecimalSeparator()">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputDecimalSeparator()"
+                        v-if="supportDecimalSeparator">
                     <span class="numpad-button-text numpad-button-text-normal">{{ decimalSeparator }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" v-if="!supportDecimalSeparator" @click="inputDoubleNum(0)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputDoubleNum(0)"
+                        v-if="!supportDecimalSeparator">
                     <span class="numpad-button-text numpad-button-text-normal">{{ `${digits[0]}${digits[0]}` }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" @click="inputNum(0)">
+                <f7-button class="numpad-button numpad-button-num" @pointerup="inputNum(0)">
                     <span class="numpad-button-text numpad-button-text-normal">{{ digits[0] }}</span>
                 </f7-button>
-                <f7-button class="numpad-button numpad-button-num" @click="backspace" @taphold="clear()">
-                <span class="numpad-button-text numpad-button-text-normal">
-                    <f7-icon class="icon-with-direction" f7="delete_left"></f7-icon>
-                </span>
+                <f7-button class="numpad-button numpad-button-num" @pointerup="backspace" @taphold="clear()">
+                    <span class="numpad-button-text numpad-button-text-normal">
+                        <f7-icon class="icon-with-direction" f7="delete_left"></f7-icon>
+                    </span>
                 </f7-button>
                 <f7-button class="numpad-button numpad-button-confirm no-right-border no-bottom-border" fill @click="confirm()">
                     <span :class="{ 'numpad-button-text': true, 'numpad-button-text-confirm': !currentSymbol }">{{ confirmText }}</span>
@@ -512,11 +514,17 @@ watch(() => props.flipNegative, (newValue) => {
     align-items: center;
     box-sizing: border-box;
     user-select: none;
-    touch-action: none;
+    touch-action: manipulation;
+    transition: transform 0.01s ease;
 }
 
 .numpad-button-num {
     width: calc(80% / 3);
+}
+
+.numpad-button-num:active,
+.numpad-button-function:active {
+    background-color: var(--f7-button-pressed-bg-color, rgba(var(--f7-theme-color-rgb), 0.15));
 }
 
 .numpad-button-function, .numpad-button-confirm {

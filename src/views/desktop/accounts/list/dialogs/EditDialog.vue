@@ -129,7 +129,7 @@
                                         v-model="account.creditCardStatementDate"
                                     ></v-autocomplete>
                                 </v-col>
-                                <v-col cols="12" :md="(!editAccountId || isNewAccount(selectedAccount)) && selectedAccount.balance ? 6 : 12"
+                                <v-col cols="12" :md="((canShowBalanceTime && selectedAccount.balance) || canShowLastReconciledTime) ? 6 : 12"
                                        v-if="account.type === AccountType.SingleAccount.type || currentAccountIndex >= 0">
                                     <amount-input :disabled="loading || submitting || (!!editAccountId && !isNewAccount(selectedAccount))"
                                                   :persistent-placeholder="true"
@@ -140,14 +140,25 @@
                                                   :placeholder="accountAmountTitle"
                                                   v-model="selectedAccount.balance"/>
                                 </v-col>
-                                <v-col cols="12" md="6" v-show="selectedAccount.balance"
-                                       v-if="(!editAccountId || isNewAccount(selectedAccount)) && (account.type === AccountType.SingleAccount.type || currentAccountIndex >= 0)">
+                                <v-col cols="12" md="6" v-show="selectedAccount.balance" v-if="canShowBalanceTime">
                                     <date-time-select
                                         :disabled="loading || submitting"
                                         :label="tt('Balance Time')"
-                                        :timezone-utc-offset="getDefaultTimezoneOffsetMinutes(selectedAccount)"
+                                        :timezone-utc-offset="getDefaultTimezoneOffsetMinutes(selectedAccount.balanceTime)"
                                         :model-value="selectedAccount.balanceTime"
                                         @update:model-value="updateAccountBalanceTime(selectedAccount, $event)"
+                                        @error="onShowDateTimeError" />
+                                </v-col>
+                                <v-col cols="12" md="6" v-if="canShowLastReconciledTime">
+                                    <date-time-select
+                                        :disabled="loading || submitting"
+                                        :clearable="true"
+                                        :label="tt('Last Reconciled Time')"
+                                        :timezone-utc-offset="getDefaultTimezoneOffsetMinutes(selectedAccount.lastReconciledTime)"
+                                        :model-value="selectedAccount.lastReconciledTime ?? getCurrentUnixTime()"
+                                        :empty-value="!selectedAccount.lastReconciledTime"
+                                        @update:model-value="updateAccountLastReconciledTime(selectedAccount, $event)"
+                                        @clear:model-value="selectedAccount.lastReconciledTime = undefined"
                                         @error="onShowDateTimeError" />
                                 </v-col>
                                 <v-col cols="12" md="12">
@@ -212,6 +223,7 @@ import { ALL_ACCOUNT_COLORS } from '@/consts/color.ts';
 import { Account } from '@/models/account.ts';
 
 import { isNumber } from '@/lib/common.ts';
+import { getCurrentUnixTime } from '@/lib/datetime.ts';
 import { generateRandomUUID } from '@/lib/misc.ts';
 
 import {
@@ -236,6 +248,7 @@ const {
     submitting,
     account,
     subAccounts,
+    useLastReconciledTime,
     title,
     saveButtonTitle,
     inputEmptyProblemMessage,
@@ -247,6 +260,7 @@ const {
     getCurrentUnixTimeForNewAccount,
     getDefaultTimezoneOffsetMinutes,
     updateAccountBalanceTime,
+    updateAccountLastReconciledTime,
     isNewAccount,
     addSubAccount,
     setAccount
@@ -261,6 +275,9 @@ const snackbar = useTemplateRef<SnackBarType>('snackbar');
 const showState = ref<boolean>(false);
 const activeTab = ref<string>('account');
 const currentAccountIndex = ref<number>(-1);
+
+const canShowBalanceTime = computed<boolean>(() => (!editAccountId.value || isNewAccount(selectedAccount.value)) && (account.value.type === AccountType.SingleAccount.type || currentAccountIndex.value >= 0));
+const canShowLastReconciledTime = computed<boolean>(() => useLastReconciledTime.value && !!editAccountId.value && !isNewAccount(selectedAccount.value) && (account.value.type === AccountType.SingleAccount.type || currentAccountIndex.value >= 0));
 
 const selectedAccount = computed<Account>(() => {
     if (currentAccountIndex.value < 0) {

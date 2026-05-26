@@ -614,6 +614,8 @@ export interface TransactionListByMaxTimeRequest {
     readonly tagFilter: string;
     readonly amountFilter: string;
     readonly keyword: string;
+    readonly mustHavePictures?: boolean;
+    readonly withPictures?: boolean;
 }
 
 export interface TransactionListInMonthByPageRequest {
@@ -625,6 +627,8 @@ export interface TransactionListInMonthByPageRequest {
     readonly tagFilter: string;
     readonly amountFilter: string;
     readonly keyword: string;
+    readonly mustHavePictures?: boolean;
+    readonly withPictures?: boolean;
 }
 
 export interface TransactionAllListRequest {

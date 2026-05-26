@@ -63,11 +63,11 @@ export function useStatisticsTransactionPageBase() {
 
     const allDateRanges = computed<LocalizedDateRange[]>(() => {
         if (analysisType.value === StatisticsAnalysisType.CategoricalAnalysis) {
-            return getAllDateRanges(DateRangeScene.Normal, true);
+            return getAllDateRanges(DateRangeScene.Normal, { includeCustom: true });
         } else if (analysisType.value === StatisticsAnalysisType.TrendAnalysis) {
-            return getAllDateRanges(DateRangeScene.TrendAnalysis, true);
+            return getAllDateRanges(DateRangeScene.TrendAnalysis, { includeCustom: true });
         } else if (analysisType.value === StatisticsAnalysisType.AssetTrends) {
-            return getAllDateRanges(DateRangeScene.AssetTrends, true);
+            return getAllDateRanges(DateRangeScene.AssetTrends, { includeCustom: true });
         } else {
             return [];
         }

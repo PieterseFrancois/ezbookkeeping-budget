@@ -66,6 +66,11 @@ export const useUserStore = defineStore('user', () => {
         return userInfo.defaultCurrency || settingsStore.localeDefaultSettings.currency;
     });
 
+    const currentUserUseLastReconciledTime = computed<boolean>(() => {
+        const userInfo = currentUserBasicInfo.value || EMPTY_USER_BASIC_INFO;
+        return userInfo.useLastReconciledTime ?? false;
+    });
+
     const currentUserFirstDayOfWeek = computed<WeekDayValue>(() => {
         const userInfo = currentUserBasicInfo.value || EMPTY_USER_BASIC_INFO;
         return isNumber(userInfo.firstDayOfWeek) && WeekDay.valueOf(userInfo.firstDayOfWeek) ? userInfo.firstDayOfWeek as WeekDayValue : settingsStore.localeDefaultSettings.firstDayOfWeek;
@@ -448,6 +453,7 @@ export const useUserStore = defineStore('user', () => {
         currentUserDefaultAccountId,
         currentUserLanguage,
         currentUserDefaultCurrency,
+        currentUserUseLastReconciledTime,
         currentUserFirstDayOfWeek,
         currentUserFiscalYearStart,
         currentUserBudgetEndDay,

@@ -55,6 +55,7 @@ import MonthPicker from '@/components/common/MonthPicker.vue';
 import TransactionCalendar from '@/components/common/TransactionCalendar.vue';
 
 import ItemIcon from '@/components/mobile/ItemIcon.vue';
+import ImageBox from '@/components/mobile/ImageBox.vue';
 import LanguageSelectButton from '@/components/mobile/LanguageSelectButton.vue';
 import PieChart from '@/components/mobile/PieChart.vue';
 import TrendsBarChart from '@/components/mobile/TrendsBarChart.vue';
@@ -150,6 +151,7 @@ app.component('MonthPicker', MonthPicker);
 app.component('TransactionCalendar', TransactionCalendar);
 
 app.component('ItemIcon', ItemIcon);
+app.component('ImageBox', ImageBox);
 app.component('LanguageSelectButton', LanguageSelectButton);
 app.component('PieChart', PieChart);
 app.component('TrendsBarChart', TrendsBarChart);
