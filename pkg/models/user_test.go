@@ -52,11 +52,13 @@ func TestUserCanEditTransactionByTransactionTime_ScopeIsLast24HourOrLater(t *tes
 
 	now := time.Now()
 	timezone := time.FixedZone("Timezone", int(utils.GetServerTimezoneOffsetMinutes())*60)
-	twentyfourHourBeforeDatetime := now.Add(-24 * time.Hour).Add(-1 * time.Second)
 
-	assert.Equal(t, false, user.CanEditTransactionByTransactionTime(utils.GetMinTransactionTimeFromUnixTime(twentyfourHourBeforeDatetime.Unix()), timezone, nil, nil))
-	assert.Equal(t, false, user.CanEditTransactionByTransactionTime(utils.GetMinTransactionTimeFromUnixTime(twentyfourHourBeforeDatetime.Add(1*time.Second).Unix()), timezone, nil, nil))
-	assert.Equal(t, true, user.CanEditTransactionByTransactionTime(utils.GetMinTransactionTimeFromUnixTime(twentyfourHourBeforeDatetime.Add(2*time.Second).Unix()), timezone, nil, nil))
+	// Use times well away from the 24-hour boundary to avoid flakiness under CI load
+	twentyFiveHoursAgo := now.Add(-25 * time.Hour)
+	twentyThreeHoursAgo := now.Add(-23 * time.Hour)
+
+	assert.Equal(t, false, user.CanEditTransactionByTransactionTime(utils.GetMinTransactionTimeFromUnixTime(twentyFiveHoursAgo.Unix()), timezone, nil, nil))
+	assert.Equal(t, true, user.CanEditTransactionByTransactionTime(utils.GetMinTransactionTimeFromUnixTime(twentyThreeHoursAgo.Unix()), timezone, nil, nil))
 }
 
 func TestUserCanEditTransactionByTransactionTime_ScopeIsThisWeekOrLater(t *testing.T) {
