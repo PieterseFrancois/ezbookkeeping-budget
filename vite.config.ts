@@ -186,7 +186,7 @@ export default defineConfig(() => {
             sourcemap: false,
             assetsInlineLimit: 0,
             emptyOutDir: true,
-            // @ts-ignore — rolldownOptions is a rolldown-specific extension not yet in Vite's published types
+            // @ts-expect-error — rolldownOptions is a rolldown-specific extension not yet in Vite's published types
             rolldownOptions: {
                 input: {
                     index: resolve(SRC_DIR, 'index.html'),

@@ -478,8 +478,7 @@ func startWebServer(c *core.CliContext) error {
 			apiV1Route.POST("/budget/targets/add.json", bindApi(api.Budget.CreateBudgetTargetHandler, config))
 			apiV1Route.POST("/budget/targets/modify.json", bindApi(api.Budget.UpdateBudgetTargetHandler, config))
 			apiV1Route.POST("/budget/targets/delete.json", bindApi(api.Budget.DeleteBudgetTargetHandler, config))
-			apiV1Route.GET("/budget/savings-actuals.json", bindApi(api.Budget.SavingsActualsHandler, config))
-			apiV1Route.GET("/budget/expense-income-actuals.json", bindApi(api.Budget.ExpenseIncomeActualsHandler, config))
+			apiV1Route.GET("/budget/actuals.json", bindApi(api.Budget.BudgetActualsHandler, config))
 			apiV1Route.POST("/budget/transaction/override/set.json", bindApi(api.Budget.SetTransactionBudgetOverrideHandler, config))
 
 			// Goals

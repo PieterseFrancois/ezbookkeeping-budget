@@ -25,11 +25,17 @@ export interface CopyDecision {
     action: 'copy' | 'copy_unhide' | 'overwrite' | 'overwrite_unhide' | 'skip';
 }
 
-export interface SavingsCategoryActual {
+// Section names returned by the unified budget actuals endpoint (mirror pkg/models BUDGET_SECTION_*)
+export type BudgetSection = 'income' | 'expense' | 'savings' | 'debt';
+
+// Per-category actual amounts, split by section. A transfer category can appear in more than one section
+// (e.g. contributions land in "savings" while withdrawals land in "income").
+export type CategoryActuals = Partial<Record<BudgetSection, number>>;
+
+interface RawBudgetActualItem {
     categoryId: string;
-    transferOut: string;
-    transferIn: string;
-    net: string;
+    section: BudgetSection;
+    amount: number;
 }
 
 function loadHiddenIds(): string[] {
@@ -62,8 +68,8 @@ export function useBudgetPageBase() {
     const hiddenCategoryIds = ref<Set<string>>(new Set(loadHiddenIds()));
     // budgetTargets: outer key = `${year}-${month}`, inner key = subcategory id
     const budgetTargets = ref<Record<string, Record<string, BudgetTargetEntry>>>({});
-    // savingsActuals: outer key = `${year}-${month}`, inner key = categoryId string
-    const savingsActuals = ref<Record<string, Record<string, SavingsCategoryActual>>>({});
+    // budgetActuals: outer key = `${year}-${month}`, inner key = categoryId, value = per-section amounts
+    const budgetActuals = ref<Record<string, Record<string, CategoryActuals>>>({});
 
     const threeMonthColumns = computed<{ year: number; month: number }[]>(() => [
         addMonths(selectedYear.value, selectedMonth.value, -1),
@@ -88,21 +94,54 @@ export function useBudgetPageBase() {
         budgetTargets.value[`${year}-${month}`] = monthMap;
     }
 
-    async function loadSavingsActuals(year: number, month: number): Promise<void> {
-        const resp = await axios.get<ApiResponse<{ items: SavingsCategoryActual[] }>>(
-            `v1/budget/savings-actuals.json?year=${year}&month=${month}`
-        );
-        const items = resp.data?.result?.items ?? [];
-        const monthMap: Record<string, SavingsCategoryActual> = {};
-        for (const item of items) {
-            monthMap[item.categoryId] = item;
-        }
-        savingsActuals.value[`${year}-${month}`] = monthMap;
+    function monthFirstUnixTime(year: number, month: number): number {
+        return Math.floor(new Date(year, month - 1, 1, 0, 0, 0, 0).getTime() / 1000);
     }
 
+    function monthLastUnixTime(year: number, month: number): number {
+        return Math.floor(new Date(year, month, 1, 0, 0, 0, 0).getTime() / 1000) - 1;
+    }
+
+    // The budget cycle runs from (endDay+1) of the previous month to endDay of the given month (0 = calendar month).
+    function cycleFirstUnixTime(year: number, month: number): number {
+        const ed = userStore.currentUserBudgetEndDay;
+        if (!ed) return monthFirstUnixTime(year, month);
+        const { year: prevYear, month: prevMonth } = addMonths(year, month, -1);
+        return Math.floor(new Date(prevYear, prevMonth - 1, ed + 1, 0, 0, 0, 0).getTime() / 1000);
+    }
+
+    function cycleLastUnixTime(year: number, month: number): number {
+        const ed = userStore.currentUserBudgetEndDay;
+        if (!ed) return monthLastUnixTime(year, month);
+        return Math.floor(new Date(year, month - 1, ed + 1, 0, 0, 0, 0).getTime() / 1000) - 1;
+    }
+
+    async function loadBudgetActuals(year: number, month: number): Promise<void> {
+        const resp = await axios.get<ApiResponse<{ items: RawBudgetActualItem[] }>>(
+            'v1/budget/actuals.json',
+            { params: { startTime: cycleFirstUnixTime(year, month), endTime: cycleLastUnixTime(year, month) } }
+        );
+        const items = resp.data?.result?.items ?? [];
+        const monthMap: Record<string, CategoryActuals> = {};
+        for (const item of items) {
+            const entry = monthMap[item.categoryId] ?? (monthMap[item.categoryId] = {});
+            entry[item.section] = (entry[item.section] ?? 0) + item.amount;
+        }
+        budgetActuals.value[`${year}-${month}`] = monthMap;
+    }
+
+    // Actual spent/received for an expense or income category (both stored positive).
+    function getExpenseIncomeActual(categoryId: string, year: number, month: number): number {
+        const entry = budgetActuals.value[`${year}-${month}`]?.[categoryId];
+        if (!entry) return 0;
+        return (entry.expense ?? 0) + (entry.income ?? 0);
+    }
+
+    // Net savings for a transfer category = contributions (into savings) minus withdrawals (out, classified as income).
     function getSavingsNet(categoryId: string, year: number, month: number): number {
-        const entry = savingsActuals.value[`${year}-${month}`]?.[categoryId];
-        return entry ? Number(entry.net) : 0;
+        const entry = budgetActuals.value[`${year}-${month}`]?.[categoryId];
+        if (!entry) return 0;
+        return (entry.savings ?? 0) - (entry.income ?? 0);
     }
 
     async function saveBudgetTarget(
@@ -217,12 +256,15 @@ export function useBudgetPageBase() {
         selectedMonth,
         hiddenCategoryIds,
         budgetTargets,
-        savingsActuals,
+        budgetActuals,
         threeMonthColumns,
         selectMonth,
         loadBudgetTargets,
-        loadSavingsActuals,
+        loadBudgetActuals,
+        getExpenseIncomeActual,
         getSavingsNet,
+        cycleFirstUnixTime,
+        cycleLastUnixTime,
         saveBudgetTarget,
         deleteBudgetTarget,
         copyBudgetFromMonth,

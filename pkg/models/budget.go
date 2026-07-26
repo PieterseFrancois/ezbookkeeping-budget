@@ -45,40 +45,30 @@ type BudgetTargetDeleteRequest struct {
 	Id int64 `json:"id,string" binding:"required,min=1"`
 }
 
-// SavingsActualGetRequest represents all parameters of savings actuals request
-type SavingsActualGetRequest struct {
-	Year  int `form:"year" binding:"required,min=1"`
-	Month int `form:"month" binding:"required,min=1,max=12"`
-}
+// Budget section names for the unified budget actuals. Each maps 1:1 to a section on the budget page.
+const (
+	BUDGET_SECTION_INCOME  = "income"
+	BUDGET_SECTION_EXPENSE = "expense"
+	BUDGET_SECTION_SAVINGS = "savings"
+	BUDGET_SECTION_DEBT    = "debt"
+)
 
-// SavingsCategoryActual represents actual transfer amounts for a single transfer category
-type SavingsCategoryActual struct {
-	CategoryId  int64 `json:"categoryId,string"`
-	TransferOut int64 `json:"transferOut,string"`
-	TransferIn  int64 `json:"transferIn,string"`
-	Net         int64 `json:"net,string"`
-}
-
-// SavingsActualsResponse represents savings actuals response
-type SavingsActualsResponse struct {
-	Items []*SavingsCategoryActual `json:"items"`
-}
-
-// BudgetExpenseIncomeActualsGetRequest represents the request for budget expense/income actuals
-type BudgetExpenseIncomeActualsGetRequest struct {
+// BudgetActualsGetRequest represents the request for the unified budget actuals
+type BudgetActualsGetRequest struct {
 	StartTime int64 `form:"startTime" binding:"required,min=1"`
 	EndTime   int64 `form:"endTime" binding:"required,min=1"`
 }
 
-// BudgetCategoryActualItem represents actual amount for a single category
-type BudgetCategoryActualItem struct {
-	CategoryId int64 `json:"categoryId,string"`
-	Amount     int64 `json:"amount"`
+// BudgetActualItem represents an actual amount for a single category within a single section
+type BudgetActualItem struct {
+	CategoryId int64  `json:"categoryId,string"`
+	Section    string `json:"section"`
+	Amount     int64  `json:"amount"`
 }
 
-// BudgetExpenseIncomeActualsResponse represents the response for budget expense/income actuals
-type BudgetExpenseIncomeActualsResponse struct {
-	Items []*BudgetCategoryActualItem `json:"items"`
+// BudgetActualsResponse represents the unified budget actuals response
+type BudgetActualsResponse struct {
+	Items []*BudgetActualItem `json:"items"`
 }
 
 // ToInfoResponse returns a view-object according to database model

@@ -29,126 +29,38 @@ var (
 	}
 )
 
-// GetSavingsActuals returns actual transfer amounts grouped by category for the given user, year and month.
-// endDay controls the budget cycle boundary (0 = calendar month).
-func (s *BudgetService) GetSavingsActuals(c core.Context, uid int64, year int, month int, endDay int, categoryIds []int64) ([]*models.SavingsCategoryActual, error) {
-	if uid <= 0 {
-		return nil, errs.ErrUserIdInvalid
-	}
-
-	if len(categoryIds) == 0 {
-		return []*models.SavingsCategoryActual{}, nil
-	}
-
-	minTransactionTime, maxTransactionTime, err := utils.GetTransactionTimeRangeByYearMonth(int32(year), int32(month), endDay)
-
-	if err != nil {
-		return nil, errs.ErrSystemError
-	}
-
-	var transactions []*models.Transaction
-	err = s.UserDataDB(uid).NewSession(c).
-		Select("transaction_id, category_id, amount, account_id").
-		Where("uid=? AND deleted=? AND transaction_time>=? AND transaction_time<=?",
-			uid, false, minTransactionTime, maxTransactionTime).
-		In("type", models.TRANSACTION_DB_TYPE_TRANSFER_OUT).
-		In("category_id", categoryIds).
-		Find(&transactions)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if len(transactions) == 0 {
-		return []*models.SavingsCategoryActual{}, nil
-	}
-
-	// Filter out transactions excluded from budget calculations
-	txIds := make([]int64, len(transactions))
-	for i, t := range transactions {
-		txIds[i] = t.TransactionId
-	}
-
-	excluded, err := TransactionBudgetOverrides.GetExcludedTransactionIds(c, uid, txIds)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(excluded) > 0 {
-		filtered := transactions[:0]
-		for _, t := range transactions {
-			if !excluded[t.TransactionId] {
-				filtered = append(filtered, t)
-			}
-		}
-		transactions = filtered
-
-		if len(transactions) == 0 {
-			return []*models.SavingsCategoryActual{}, nil
-		}
-	}
-
-	// Collect unique source account IDs to classify contributions vs withdrawals
-	accountIdSet := make(map[int64]struct{})
-	for _, t := range transactions {
-		accountIdSet[t.AccountId] = struct{}{}
-	}
-	accountIds := make([]int64, 0, len(accountIdSet))
-	for id := range accountIdSet {
-		accountIds = append(accountIds, id)
-	}
-
-	var accounts []*models.Account
-	err = s.UserDataDB(uid).NewSession(c).
-		Select("account_id, category").
-		Where("uid=? AND deleted=?", uid, false).
-		In("account_id", accountIds).
-		Find(&accounts)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// Mark accounts that are savings or investment accounts
-	savingsAccountIds := make(map[int64]bool, len(accounts))
-	for _, a := range accounts {
-		if a.Category == models.ACCOUNT_CATEGORY_SAVINGS_ACCOUNT || a.Category == models.ACCOUNT_CATEGORY_INVESTMENT {
-			savingsAccountIds[a.AccountId] = true
-		}
-	}
-
-	resultMap := make(map[int64]*models.SavingsCategoryActual)
-
-	for _, t := range transactions {
-		actual, exists := resultMap[t.CategoryId]
-
-		if !exists {
-			actual = &models.SavingsCategoryActual{CategoryId: t.CategoryId}
-			resultMap[t.CategoryId] = actual
-		}
-
-		// Source is a savings/investment account → money is leaving savings (withdrawal)
-		// Source is any other account → money is flowing into savings (contribution)
-		if savingsAccountIds[t.AccountId] {
-			actual.TransferIn += t.Amount
-		} else {
-			actual.TransferOut += t.Amount
-		}
-	}
-
-	result := make([]*models.SavingsCategoryActual, 0, len(resultMap))
-
-	for _, actual := range resultMap {
-		actual.Net = actual.TransferOut - actual.TransferIn
-		result = append(result, actual)
-	}
-
-	return result, nil
+// isSavingsOrInvestmentCategory reports whether an account category holds savings/investments (i.e. "net-worth" money).
+func isSavingsOrInvestmentCategory(cat models.AccountCategory) bool {
+	return cat == models.ACCOUNT_CATEGORY_SAVINGS_ACCOUNT || cat == models.ACCOUNT_CATEGORY_INVESTMENT
 }
 
-// GetExpenseIncomeActuals returns actual expense and income amounts grouped by category for the given time range,
-// filtered to exclude transactions marked as excluded from budget.
-func (s *BudgetService) GetExpenseIncomeActuals(c core.Context, uid int64, startTime int64, endTime int64) ([]*models.BudgetCategoryActualItem, error) {
+// isSpendableCategory reports whether an account category is spendable cash (an asset that is not savings/investment).
+func isSpendableCategory(cat models.AccountCategory) bool {
+	return cat.IsAsset() && !isSavingsOrInvestmentCategory(cat)
+}
+
+// classifyTransferSection maps a transfer (by its source and destination account categories) to a budget section.
+// Returns "" for transfers that are not budgeted (e.g. moving cash between two spendable accounts).
+func classifyTransferSection(src models.AccountCategory, dst models.AccountCategory) string {
+	if isSpendableCategory(src) && isSavingsOrInvestmentCategory(dst) {
+		return models.BUDGET_SECTION_SAVINGS // spendable -> savings/investment (a contribution)
+	}
+
+	if isSpendableCategory(src) && dst.IsLiability() {
+		return models.BUDGET_SECTION_DEBT // spendable -> liability (a card/loan paydown)
+	}
+
+	if isSavingsOrInvestmentCategory(src) && isSpendableCategory(dst) {
+		return models.BUDGET_SECTION_INCOME // savings/investment -> spendable (a withdrawal, acts like income)
+	}
+
+	return ""
+}
+
+// GetBudgetActuals returns actual amounts grouped by (category, section) for the given time range, in a single pass.
+// Expense/income transactions map to their section by type; transfers map by the direction of money relative to
+// spendable cash (see classifyTransferSection). Transactions excluded from budget are skipped across all sections.
+func (s *BudgetService) GetBudgetActuals(c core.Context, uid int64, startTime int64, endTime int64) ([]*models.BudgetActualItem, error) {
 	if uid <= 0 {
 		return nil, errs.ErrUserIdInvalid
 	}
@@ -158,10 +70,10 @@ func (s *BudgetService) GetExpenseIncomeActuals(c core.Context, uid int64, start
 
 	var transactions []*models.Transaction
 	err := s.UserDataDB(uid).NewSession(c).
-		Select("transaction_id, category_id, amount").
+		Select("transaction_id, type, category_id, amount, account_id, related_account_id").
 		Where("uid=? AND deleted=? AND transaction_time>=? AND transaction_time<=?",
 			uid, false, minTransactionTime, maxTransactionTime).
-		In("type", models.TRANSACTION_DB_TYPE_EXPENSE, models.TRANSACTION_DB_TYPE_INCOME).
+		In("type", models.TRANSACTION_DB_TYPE_EXPENSE, models.TRANSACTION_DB_TYPE_INCOME, models.TRANSACTION_DB_TYPE_TRANSFER_OUT).
 		Find(&transactions)
 
 	if err != nil {
@@ -169,9 +81,10 @@ func (s *BudgetService) GetExpenseIncomeActuals(c core.Context, uid int64, start
 	}
 
 	if len(transactions) == 0 {
-		return []*models.BudgetCategoryActualItem{}, nil
+		return []*models.BudgetActualItem{}, nil
 	}
 
+	// Filter out transactions excluded from budget calculations (applies to every section)
 	txIds := make([]int64, len(transactions))
 	for i, t := range transactions {
 		txIds[i] = t.TransactionId
@@ -182,17 +95,78 @@ func (s *BudgetService) GetExpenseIncomeActuals(c core.Context, uid int64, start
 		return nil, err
 	}
 
-	totals := make(map[int64]int64)
+	// Collect account ids referenced by transfers so we can classify each leg by account category
+	accountIdSet := make(map[int64]struct{})
+	for _, t := range transactions {
+		if t.Type == models.TRANSACTION_DB_TYPE_TRANSFER_OUT {
+			accountIdSet[t.AccountId] = struct{}{}
+			accountIdSet[t.RelatedAccountId] = struct{}{}
+		}
+	}
+
+	accountCategory := make(map[int64]models.AccountCategory)
+
+	if len(accountIdSet) > 0 {
+		accountIds := make([]int64, 0, len(accountIdSet))
+		for id := range accountIdSet {
+			accountIds = append(accountIds, id)
+		}
+
+		var accounts []*models.Account
+		err = s.UserDataDB(uid).NewSession(c).
+			Select("account_id, category").
+			Where("uid=? AND deleted=?", uid, false).
+			In("account_id", accountIds).
+			Find(&accounts)
+
+		if err != nil {
+			return nil, err
+		}
+
+		for _, a := range accounts {
+			accountCategory[a.AccountId] = a.Category
+		}
+	}
+
+	// Aggregate amounts by (categoryId, section)
+	type sectionKey struct {
+		categoryId int64
+		section    string
+	}
+
+	totals := make(map[sectionKey]int64)
+
 	for _, t := range transactions {
 		if excluded[t.TransactionId] {
 			continue
 		}
-		totals[t.CategoryId] += t.Amount
+
+		var section string
+
+		switch t.Type {
+		case models.TRANSACTION_DB_TYPE_EXPENSE:
+			section = models.BUDGET_SECTION_EXPENSE
+		case models.TRANSACTION_DB_TYPE_INCOME:
+			section = models.BUDGET_SECTION_INCOME
+		case models.TRANSACTION_DB_TYPE_TRANSFER_OUT:
+			section = classifyTransferSection(accountCategory[t.AccountId], accountCategory[t.RelatedAccountId])
+		}
+
+		if section == "" {
+			continue
+		}
+
+		totals[sectionKey{categoryId: t.CategoryId, section: section}] += t.Amount
 	}
 
-	result := make([]*models.BudgetCategoryActualItem, 0, len(totals))
-	for catId, amount := range totals {
-		result = append(result, &models.BudgetCategoryActualItem{CategoryId: catId, Amount: amount})
+	result := make([]*models.BudgetActualItem, 0, len(totals))
+
+	for key, amount := range totals {
+		result = append(result, &models.BudgetActualItem{
+			CategoryId: key.categoryId,
+			Section:    key.section,
+			Amount:     amount,
+		})
 	}
 
 	return result, nil

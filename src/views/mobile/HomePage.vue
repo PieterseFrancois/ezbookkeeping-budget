@@ -252,7 +252,6 @@ import { CategoryType } from '@/core/category.ts';
 import { TemplateType } from '@/core/template.ts';
 import { TransactionTemplate } from '@/models/transaction_template.ts';
 import type { ApiResponse } from '@/core/api.ts';
-import services from '@/lib/services.ts';
 
 import { isFunction } from '@/lib/common.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
@@ -317,11 +316,10 @@ interface BudgetTargetRawItem {
     amount: string;
 }
 
-interface SavingsActualRawItem {
+interface BudgetActualRawItem {
     categoryId: string;
-    transferOut: string;
-    transferIn: string;
-    net: string;
+    section: string;
+    amount: number;
 }
 
 async function loadBudgetOverview(): Promise<void> {
@@ -352,27 +350,32 @@ async function loadBudgetOverview(): Promise<void> {
     cycleYear.value = year;
     cycleMonth.value = month;
 
-    const [budgetResp, statsResp, savingsResp] = await Promise.all([
+    const [budgetResp, actualsResp] = await Promise.all([
         axios.get<ApiResponse<BudgetTargetRawItem[]>>(`v1/budget/targets.json?year=${year}&month=${month}`),
-        services.getTransactionStatistics({ startTime, endTime, tagFilter: '', keyword: '', useTransactionTimezone: false, matchMode: 0 }),
-        axios.get<ApiResponse<{ items: SavingsActualRawItem[] }>>(`v1/budget/savings-actuals.json?year=${year}&month=${month}`)
+        axios.get<ApiResponse<{ items: BudgetActualRawItem[] }>>('v1/budget/actuals.json', { params: { startTime, endTime } })
     ]);
 
     const targets = budgetResp.data?.result ?? [];
-    const statsItems = statsResp.data?.result?.items ?? [];
-    const savingsItems = savingsResp.data?.result?.items ?? [];
+    const actualItems = actualsResp.data?.result?.items ?? [];
 
-    const spentBySubcategoryId: Record<string, number> = {};
-    for (const item of statsItems) {
-        const cat = transactionCategoriesStore.allTransactionCategoriesMap[item.categoryId];
-        if (cat && cat.type === CategoryType.Expense) {
-            spentBySubcategoryId[item.categoryId] = (spentBySubcategoryId[item.categoryId] ?? 0) + item.amount;
-        }
+    // Per-category amounts split by section (the backend already excludes budget-excluded transactions)
+    const sectionByCat: Record<string, Partial<Record<string, number>>> = {};
+    for (const item of actualItems) {
+        const entry = sectionByCat[item.categoryId] ?? (sectionByCat[item.categoryId] = {});
+        entry[item.section] = (entry[item.section] ?? 0) + item.amount;
     }
 
+    const spentBySubcategoryId: Record<string, number> = {};
     const savingsNetBySubId: Record<string, number> = {};
-    for (const item of savingsItems) {
-        savingsNetBySubId[item.categoryId] = Number(item.net);
+    for (const [catId, sections] of Object.entries(sectionByCat)) {
+        if (sections['expense']) {
+            spentBySubcategoryId[catId] = sections['expense'];
+        }
+        // Net savings = contributions into savings minus withdrawals (classified as income)
+        const net = (sections['savings'] ?? 0) - (sections['income'] ?? 0);
+        if (net !== 0) {
+            savingsNetBySubId[catId] = net;
+        }
     }
 
     const budgetedSubcategoryIds = new Set<string>();

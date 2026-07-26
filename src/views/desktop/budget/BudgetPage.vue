@@ -576,7 +576,6 @@ import { useUserStore } from '@/stores/user.ts';
 import { CategoryType } from '@/core/category.ts';
 import type { TransactionCategory } from '@/models/transaction_category.ts';
 import { parseDateTimeFromUnixTime } from '@/lib/datetime.ts';
-import services from '@/lib/services.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 
 import {
@@ -605,11 +604,12 @@ const {
     selectedMonth,
     hiddenCategoryIds,
     budgetTargets,
-    savingsActuals,
+    budgetActuals,
     threeMonthColumns,
     selectMonth,
     loadBudgetTargets,
-    loadSavingsActuals,
+    loadBudgetActuals,
+    getExpenseIncomeActual,
     getSavingsNet,
     saveBudgetTarget,
     copyBudgetFromMonth,
@@ -637,7 +637,6 @@ const budgetCycleNote = computed<string>(() => {
 // ---------- UI state ----------
 
 const loading = ref<boolean>(true);
-const spentByMonth = ref<Record<string, Record<string, number>>>({});
 const expandedParents = ref<Set<string>>(new Set());
 const saving = ref<boolean>(false);
 const showIncomeSection = ref<boolean>(true);
@@ -790,26 +789,6 @@ function monthFirstUnixTime(year: number, month: number): number {
     return Math.floor(new Date(year, month - 1, 1, 0, 0, 0, 0).getTime() / 1000);
 }
 
-function monthLastUnixTime(year: number, month: number): number {
-    return Math.floor(new Date(year, month, 1, 0, 0, 0, 0).getTime() / 1000) - 1;
-}
-
-// Cycle-aware boundaries — used for the statistics query only.
-// When endDay > 0, "May" covers (endDay+1) Apr to endDay May.
-function cycleFirstUnixTime(year: number, month: number): number {
-    const endDay = userStore.currentUserBudgetEndDay;
-    if (!endDay) return monthFirstUnixTime(year, month);
-    const { year: prevYear, month: prevMonth } = addMonths(year, month, -1);
-    return Math.floor(new Date(prevYear, prevMonth - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000);
-}
-
-function cycleLastUnixTime(year: number, month: number): number {
-    const endDay = userStore.currentUserBudgetEndDay;
-    if (!endDay) return monthLastUnixTime(year, month);
-    // end of endDay (exclusive start of endDay+1)
-    return Math.floor(new Date(year, month - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000) - 1;
-}
-
 function formatColumnTitle(col: { year: number; month: number }): string {
     return formatDateTimeToGregorianLikeLongYearMonth(
         parseDateTimeFromUnixTime(monthFirstUnixTime(col.year, col.month))
@@ -911,7 +890,7 @@ function subBudgeted(subcatId: string, col: { year: number; month: number }): nu
 }
 
 function subActual(subcatId: string, col: { year: number; month: number }): number {
-    return spentByMonth.value[`${col.year}-${col.month}`]?.[subcatId] ?? 0;
+    return getExpenseIncomeActual(subcatId, col.year, col.month);
 }
 
 function subRemaining(subcatId: string, col: { year: number; month: number }): number {
@@ -1077,25 +1056,11 @@ function cancelEdit(): void {
 
 // ---------- Data loading ----------
 
-async function loadStatsForMonth(year: number, month: number): Promise<void> {
-    const resp = await services.getBudgetExpenseIncomeActuals(
-        cycleFirstUnixTime(year, month),
-        cycleLastUnixTime(year, month)
-    );
-    const items = resp.data?.result?.items ?? [];
-    const monthActual: Record<string, number> = {};
-    for (const item of items) {
-        monthActual[item.categoryId] = (monthActual[item.categoryId] ?? 0) + item.amount;
-    }
-    spentByMonth.value[`${year}-${month}`] = monthActual;
-}
-
 async function loadMonthData(year: number, month: number): Promise<void> {
     const key = `${year}-${month}`;
     const tasks: Promise<void>[] = [];
     if (!budgetTargets.value[key]) tasks.push(loadBudgetTargets(year, month));
-    if (!spentByMonth.value[key]) tasks.push(loadStatsForMonth(year, month));
-    if (!savingsActuals.value[key]) tasks.push(loadSavingsActuals(year, month));
+    if (!budgetActuals.value[key]) tasks.push(loadBudgetActuals(year, month));
     await Promise.all(tasks);
 }
 
