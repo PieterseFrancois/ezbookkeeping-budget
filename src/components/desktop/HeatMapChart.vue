@@ -1,10 +1,12 @@
 <template>
-    <v-chart autoresize :class="finalClass" :style="finalStyle" :option="chartOptions" />
+    <v-chart autoresize :class="finalClass" :style="finalStyle" :option="chartOptions"
+             @click="clickItem" />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useTheme } from 'vuetify';
+import type { ECElementEvent } from 'echarts/core';
 import type { CallbackDataParams } from 'echarts/types/dist/shared';
 
 import { useI18n } from '@/locales/helpers.ts';
@@ -26,6 +28,7 @@ const props = defineProps<{
     class?: string;
     skeleton?: boolean;
     showValue?: boolean;
+    enableClickItem?: boolean;
     categoryTypeName: string;
     allCategoryNames: string[];
     items: Record<string, unknown>[];
@@ -39,6 +42,10 @@ const props = defineProps<{
     defaultCurrency?: string;
 }>();
 
+const emit = defineEmits<{
+    (e: 'click', categoryIndex: number, seriesIndex: number): void;
+}>();
+
 const theme = useTheme();
 
 const {
@@ -47,6 +54,7 @@ const {
     formatAmountToLocalizedNumeralsWithCurrency,
     formatAmountToWesternArabicNumeralsWithoutDigitGrouping,
     formatNumberToLocalizedNumerals,
+    formatNumberToWesternArabicNumeralsWithoutDigitGrouping,
     formatPercentToLocalizedNumerals
 } = useI18n();
 
@@ -265,7 +273,23 @@ function getDisplayValue(value: number): string {
         return formatAmountToLocalizedNumeralsWithCurrency(value, props.defaultCurrency);
     }
 
-    return formatNumberToLocalizedNumerals(value, 2);
+    return formatNumberToLocalizedNumerals(value, 4);
+}
+
+function clickItem(e: ECElementEvent): void {
+    if (!props.enableClickItem || e.componentType !== 'series') {
+        return;
+    }
+
+    const dataItem = e.data as [number, number, number];
+
+    if (!dataItem) {
+        return;
+    }
+
+    const categoryIndex = dataItem[0];
+    const seriesIndex = dataItem[1];
+    emit('click', categoryIndex, seriesIndex);
 }
 
 function exportData(): { headers: string[], data: string[][] } {
@@ -289,7 +313,12 @@ function exportData(): { headers: string[], data: string[][] } {
         row.push(seriesName);
         for (let categoryIndex = 0; categoryIndex < props.allCategoryNames.length; categoryIndex++) {
             const value = allData[`${categoryIndex}-${seriesKey}`];
-            row.push(formatAmountToWesternArabicNumeralsWithoutDigitGrouping(value ?? 0, props.defaultCurrency));
+
+            if (props.amountValue) {
+                row.push(formatAmountToWesternArabicNumeralsWithoutDigitGrouping(value ?? 0, props.defaultCurrency));
+            } else {
+                row.push(formatNumberToWesternArabicNumeralsWithoutDigitGrouping(value ?? 0));
+            }
         }
         data.push(row);
     }

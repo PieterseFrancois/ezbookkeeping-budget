@@ -1,18 +1,21 @@
 <template>
-    <v-chart autoresize :class="finalClass" :option="chartOptions" />
+    <v-chart autoresize :class="finalClass" :option="chartOptions"
+             @click="clickItem" />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useTheme } from 'vuetify';
+import type { ECElementEvent } from 'echarts/core';
 import type { CallbackDataParams } from 'echarts/types/dist/shared';
 
 import { useI18n } from '@/locales/helpers.ts';
 
+import { useSettingsStore } from '@/stores/setting.ts';
+
 import { itemAndIndex } from '@/core/base.ts';
 import type { ColorValue, ColorStyleValue } from '@/core/color.ts';
 import { ThemeType } from '@/core/theme.ts';
-import { DEFAULT_CHART_COLORS } from '@/consts/color.ts';
 
 import { isArray, isString, isNumber } from '@/lib/common.ts';
 import { getDisplayColor } from '@/lib/color.ts';
@@ -22,6 +25,8 @@ export type HierarchyChartDisplayType = 'treemap' | 'sunburst';
 interface HierarchyDataItem {
     name: string;
     value: number;
+    categoryIndex?: number;
+    seriesIndex?: number;
     children?: HierarchyDataItem[];
     itemStyle: {
         color: ColorStyleValue;
@@ -33,6 +38,7 @@ const props = defineProps<{
     skeleton?: boolean;
     type: HierarchyChartDisplayType;
     showValue?: boolean;
+    enableClickItem?: boolean;
     categoryTypeName: string;
     allCategoryNames: string[];
     items: Record<string, unknown>[];
@@ -46,6 +52,10 @@ const props = defineProps<{
     defaultCurrency?: string;
 }>();
 
+const emit = defineEmits<{
+    (e: 'click', categoryIndex: number, seriesIndex: number): void;
+}>();
+
 const theme = useTheme();
 
 const {
@@ -53,10 +63,15 @@ const {
     formatAmountToLocalizedNumeralsWithCurrency,
     formatAmountToWesternArabicNumeralsWithoutDigitGrouping,
     formatNumberToLocalizedNumerals,
+    formatNumberToWesternArabicNumeralsWithoutDigitGrouping,
     formatPercentToLocalizedNumerals
 } = useI18n();
 
+const settingsStore = useSettingsStore();
+
 const isDarkMode = computed<boolean>(() => theme.global.name.value === ThemeType.Dark);
+const chartColors = computed<ColorValue[]>(() => settingsStore.chartColorList);
+
 const finalClass = computed<string>(() => {
     let finalClass = '';
 
@@ -85,7 +100,7 @@ const hierarchyData = computed<HierarchyDataItem[]>(() => {
             continue;
         }
 
-        const color: ColorStyleValue = getDisplayColor((props.colorField && item[props.colorField]) ? item[props.colorField] as ColorValue : DEFAULT_CHART_COLORS[seriesIndex % DEFAULT_CHART_COLORS.length]);
+        const color: ColorStyleValue = getDisplayColor((props.colorField && item[props.colorField]) ? item[props.colorField] as ColorValue : chartColors.value[seriesIndex % chartColors.value.length]);
 
         const hierarchyItem: HierarchyDataItem = {
             name: getItemName(item[props.nameField] as string),
@@ -103,6 +118,8 @@ const hierarchyData = computed<HierarchyDataItem[]>(() => {
             hierarchyItem.children?.push({
                 name: props.allCategoryNames[categoryIndex] ?? '',
                 value: amount,
+                categoryIndex: categoryIndex,
+                seriesIndex: seriesIndex,
                 itemStyle: {
                     color: color
                 }
@@ -209,7 +226,19 @@ function getDisplayValue(value: number): string {
         return formatAmountToLocalizedNumeralsWithCurrency(value, props.defaultCurrency);
     }
 
-    return formatNumberToLocalizedNumerals(value, 2);
+    return formatNumberToLocalizedNumerals(value, 4);
+}
+
+function clickItem(e: ECElementEvent): void {
+    if (!props.enableClickItem || e.componentType !== 'series' || !e.data) {
+        return;
+    }
+
+    const dataItem = e.data as HierarchyDataItem;
+
+    if (isNumber(dataItem.categoryIndex) && isNumber(dataItem.seriesIndex)) {
+        emit('click', dataItem.categoryIndex, dataItem.seriesIndex);
+    }
 }
 
 function exportData(): { headers: string[], data: string[][] } {
@@ -227,7 +256,11 @@ function exportData(): { headers: string[], data: string[][] } {
         row.push(item.name);
 
         for (const child of item.children ?? []) {
-            row.push(formatAmountToWesternArabicNumeralsWithoutDigitGrouping(child.value));
+            if (props.amountValue) {
+                row.push(formatAmountToWesternArabicNumeralsWithoutDigitGrouping(child.value, props.defaultCurrency));
+            } else {
+                row.push(formatNumberToWesternArabicNumeralsWithoutDigitGrouping(child.value));
+            }
         }
 
         data.push(row);

@@ -32,7 +32,8 @@ import {
 } from '@/core/base.ts';
 
 import {
-    TextDirection
+    TextDirection,
+    KeywordMatchMode
 } from '@/core/text.ts';
 
 import {
@@ -112,6 +113,10 @@ import {
 import {
     PresetAmountColor
 } from '@/core/color.ts';
+
+import {
+    ImageUploadQualityType
+} from '@/core/image.ts';
 
 import {
     type LocalizedAccountCategory,
@@ -554,6 +559,28 @@ export function useI18n() {
                 type: calendarDisplayType.type,
                 displayName: t('calendar.' + calendarDisplayType.name)
             });
+        }
+
+        return ret;
+    }
+
+    function getAllImageUploadQualityTypes(): TypeAndDisplayName[] {
+        const ret: TypeAndDisplayName[] = [];
+
+        for (const qualityType of ImageUploadQualityType.values()) {
+            if (isNumber(qualityType.maxLongSidePixels)) {
+                ret.push({
+                    type: qualityType.type,
+                    displayName: t(`format.volume.${qualityType.name}`, {
+                        size: qualityType.estimatedKiB ? appendDigitGroupingSymbolAndDecimalSeparator(qualityType.estimatedKiB.toString(), getNumberFormatOptions({})) : '-',
+                    })
+                });
+            } else {
+                ret.push({
+                    type: qualityType.type,
+                    displayName: t(qualityType.name)
+                })
+            }
         }
 
         return ret;
@@ -1528,7 +1555,7 @@ export function useI18n() {
         return availableExchangeRates;
     }
 
-    function getAllSupportedImportFileCagtegoryAndTypes(): LocalizedImportFileCategoryAndTypes[] {
+    function getAllSupportedImportFileCagtegoryAndTypes(supportAITextRecognition: boolean, supportAIImageRecognition: boolean): LocalizedImportFileCategoryAndTypes[] {
         const allSupportedImportFileCategoryAndTypes: LocalizedImportFileCategoryAndTypes[] = [];
 
         for (const categoryAndTypes of SUPPORTED_IMPORT_FILE_CATEGORY_AND_TYPES) {
@@ -1538,6 +1565,14 @@ export function useI18n() {
             };
 
             for (const fileType of categoryAndTypes.fileTypes) {
+                if (fileType.needAITextRecognition && !supportAITextRecognition) {
+                    continue;
+                }
+
+                if (fileType.needAIImageRecognition && !supportAIImageRecognition) {
+                    continue;
+                }
+
                 let document: LocalizedImportFileDocument | undefined;
 
                 if (fileType.document) {
@@ -1621,7 +1656,10 @@ export function useI18n() {
                     subTypes: subTypes.length ? subTypes : undefined,
                     supportedEncodings: supportedEncodings.length ? supportedEncodings : undefined,
                     dataFromTextbox: fileType.dataFromTextbox,
+                    needAITextRecognition: fileType.needAITextRecognition,
+                    needAIImageRecognition: fileType.needAIImageRecognition,
                     supportedAdditionalOptions: fileType.supportedAdditionalOptions,
+                    supportedAIAdditionalPrompt: fileType.supportedAIAdditionalPrompt,
                     document: document
                 };
 
@@ -2543,6 +2581,8 @@ export function useI18n() {
         getAllCurrencyDisplayTypes,
         getAllCurrencySortingTypes: () => getLocalizedDisplayNameAndType(CurrencySortingType.values()),
         getAllCoordinateDisplayTypes: () => getLocalizedDisplayNameAndTypeWithSystemDefault(CoordinateDisplayType.values(), CoordinateDisplayType.SystemDefaultType, CoordinateDisplayType.Default),
+        getAllKeywordMatchModes: () => getLocalizedDisplayNameAndType(KeywordMatchMode.values()),
+        getAllImageUploadQualityTypes,
         getAllExpenseAmountColors: () => getAllExpenseIncomeAmountColors(CategoryType.Expense),
         getAllIncomeAmountColors: () => getAllExpenseIncomeAmountColors(CategoryType.Income),
         getAllAccountCategories,

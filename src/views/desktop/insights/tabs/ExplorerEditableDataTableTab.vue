@@ -12,7 +12,7 @@
                         :disabled="true"
                         :label="tt('Data Source')"
                         :items="allDataTableQuerySources"
-                        :model-value="currentExplorer.datatableQuerySource"
+                        :model-value="currentExploration.datatableQuerySource"
                     />
                     <v-select
                         class="flex-0-0"
@@ -23,7 +23,7 @@
                         :disabled="loading || disabled"
                         :label="tt('Transactions Per Page')"
                         :items="allPageCounts"
-                        v-model="currentExplorer.countPerPage"
+                        v-model="currentExploration.countPerPage"
                     />
                     <v-spacer/>
                     <div class="d-flex align-center">
@@ -40,11 +40,11 @@
         fixed-footer
         multi-sort
         item-value="index"
-        :class="{ 'insights-editable-explorer-table': true, 'text-sm': true, 'disabled': loading || disabled, 'loading-skeleton': loading }"
+        :class="{ 'insights-editable-explorer-table': true, 'disabled': loading || disabled, 'loading-skeleton': loading }"
         :headers="editableDataTableHeaders"
         :items="filteredTransactions"
         :hover="true"
-        v-model:items-per-page="currentExplorer.countPerPage"
+        v-model:items-per-page="currentExploration.countPerPage"
         v-model:page="currentPage"
     >
         <template #header.data-table-select>
@@ -156,6 +156,11 @@
             <span :class="{ 'text-expense': item.type === TransactionType.Expense, 'text-income': item.type === TransactionType.Income }">{{ getDisplaySourceAmount(item) }}</span>
             <v-icon class="icon-with-direction mx-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer && item.sourceAccount?.id !== item.destinationAccount?.id && getDisplaySourceAmount(item) !== getDisplayDestinationAmount(item)"></v-icon>
             <span v-if="item.type === TransactionType.Transfer && item.sourceAccount?.id !== item.destinationAccount?.id && getDisplaySourceAmount(item) !== getDisplayDestinationAmount(item)">{{ getDisplayDestinationAmount(item) }}</span>
+            <v-tooltip activator="parent" v-if="!item.hideAmount && ((item.type !== TransactionType.Transfer && item.sourceAccount?.currency !== defaultCurrency) || (item.type === TransactionType.Transfer && item.sourceAccount?.currency !== defaultCurrency && item.destinationAccount?.currency !== defaultCurrency))">
+                <span>{{ getDisplaySourceAmount(item, true) }}</span>
+                <v-icon class="ms-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer && item.sourceAccount?.id !== item.destinationAccount?.id && item.sourceAccount?.currency !== item.destinationAccount?.currency && item.sourceAmount !== item.destinationAmount"></v-icon>
+                <span v-if="item.type === TransactionType.Transfer && item.sourceAccount?.id !== item.destinationAccount?.id && item.sourceAccount?.currency !== item.destinationAccount?.currency && item.sourceAmount !== item.destinationAmount">{{ getDisplayDestinationAmount(item, true) }}</span>
+            </v-tooltip>
         </template>
         <template #item.sourceAccountName="{ item }">
             <div class="d-flex align-center">
@@ -271,7 +276,8 @@ const {
 
 const {
     currentPage,
-    currentExplorer,
+    defaultCurrency,
+    currentExploration,
     filteredTransactions,
     allDataTableQuerySources,
     allPageCounts,

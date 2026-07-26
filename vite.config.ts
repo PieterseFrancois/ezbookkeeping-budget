@@ -181,11 +181,13 @@ export default defineConfig(() => {
                 'firefox91',
                 'safari15.4'
             ],
+            minify: 'terser',
             outDir: BUILD_DIR,
             sourcemap: false,
             assetsInlineLimit: 0,
             emptyOutDir: true,
-            rollupOptions: {
+            // @ts-ignore — rolldownOptions is a rolldown-specific extension not yet in Vite's published types
+            rolldownOptions: {
                 input: {
                     index: resolve(SRC_DIR, 'index.html'),
                     desktop: resolve(SRC_DIR, 'desktop.html'),
@@ -194,7 +196,8 @@ export default defineConfig(() => {
                     'vendor-framework7-rtl': resolve(SRC_DIR, 'mobile-rtl.scss')
                 },
                 output: {
-                    assetFileNames: assetInfo => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    assetFileNames: (assetInfo: any) => {
                         const fileExt = assetInfo.names[0]?.split('.')[1];
 
                         if (!fileExt) {
@@ -213,36 +216,68 @@ export default defineConfig(() => {
                     },
                     chunkFileNames: 'js/[name]-[hash].js',
                     entryFileNames: 'js/[name]-[hash].js',
-                    manualChunks: id => {
-                        if (/[\\/]node_modules[\\/]leaflet[\\/]/i.test(id)) {
-                            return 'leaflet';
-                        } else if (/[\\/]node_modules[\\/](moment|moment-timezone)[\\/]/i.test(id)) {
-                            return 'moment';
-                        } else if (/[\\/]node_modules[\\/](dom7|framework7.*|skeleton-elements|swiper)[\\/]/i.test(id)) {
-                            return 'vendor-mobile';
-                        } else if (/[\\/]node_modules[\\/](vuetify|vue-router|vue3-perfect-scrollbar|perfect-scrollbar|vuedraggable|sortablejs|@mdi.*)[\\/]/i.test(id)) {
-                            return 'vendor-desktop';
-                        } else if (/[\\/]node_modules[\\/](echarts|zrender|tslib|resize-detector|vue-echarts)[\\/]/i.test(id)) {
-                            return 'vendor-desktop';
-                        } else if (/plugin-vuetify:/i.test(id)) {
-                            return 'vendor-desktop';
-                        } else if (/[\\/]node_modules[\\/]/i.test(id)) {
-                            return 'vendor-common';
-                        } else if (/[\\/]src[\\/](core|consts|models|stores)[\\/]/i.test(id)) {
-                            return 'common';
-                        } else if (/[\\/]src[\\/]lib[\\/](map[\\/]|ui[\\/]common|[a-zA-Z0-9-_]+\.(js|ts))/i.test(id)) {
-                            return 'common';
-                        } else if (/[\\/]src[\\/]components[\\/](base|common)[\\/]/i.test(id)) {
-                            return 'common';
-                        } else if (/[\\/]src[\\/]views[\\/]base[\\/]/i.test(id)) {
-                            return 'common';
-                        } else if (/[\\/]src[\\/]locales[\\/]helpers\.(js|ts)/i.test(id)) {
-                            return 'common';
-                        } else if (/[\\/]src[\\/]locales[\\/]/i.test(id)) {
-                            return 'locales';
-                        } else {
-                            return null;
-                        }
+                    codeSplitting: {
+                        includeDependenciesRecursively: false,
+                        groups: [
+                            {
+                                name:  'leaflet',
+                                test: /[\\/]node_modules[\\/]leaflet[\\/]/i
+                            },
+                            {
+                                name:  'moment',
+                                test: /[\\/]node_modules[\\/](moment|moment-timezone)[\\/]/i
+                            },
+                            {
+                                name:  'echarts',
+                                test: /[\\/]node_modules[\\/](echarts|zrender|tslib|resize-detector)[\\/]/i
+                            },
+                            {
+                                name:  'vendor-mobile',
+                                test: /[\\/]node_modules[\\/](dom7|framework7.*|skeleton-elements|swiper)[\\/]/i
+                            },
+                            {
+                                name:  'vendor-desktop',
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            test: (id: any) => {
+                                    if (/[\\/]node_modules[\\/](vuetify|vue-router|vue3-perfect-scrollbar|perfect-scrollbar|vuedraggable|sortablejs|@mdi.*)[\\/]/i.test(id)) {
+                                        return true;
+                                    } else if (/[\\/]node_modules[\\/]vue-echarts[\\/]/i.test(id)) {
+                                        return true;
+                                    } else if (/plugin-vuetify:/i.test(id)) {
+                                        return true;
+                                    } else {
+                                        return false;
+                                    }
+                                }
+                            },
+                            {
+                                name:  'vendor-common',
+                                test: /[\\/]node_modules[\\/]/i
+                            },
+                            {
+                                name:  'common',
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            test: (id: any) => {
+                                    if (/[\\/]src[\\/](core|consts|models|stores)[\\/]/i.test(id)) {
+                                        return true;
+                                    } else if (/[\\/]src[\\/]lib[\\/](map[\\/]|ui[\\/]common|calendar[\\/]|[a-zA-Z0-9-_]+\.(js|ts))/i.test(id)) {
+                                        return true;
+                                    } else if (/[\\/]src[\\/]components[\\/](base|common)[\\/]/i.test(id)) {
+                                        return true;
+                                    } else if (/[\\/]src[\\/]views[\\/]base[\\/]/i.test(id)) {
+                                        return true;
+                                    } else if (/[\\/]src[\\/]locales[\\/]helpers\.(js|ts)/i.test(id)) {
+                                        return true;
+                                    } else {
+                                        return false;
+                                    }
+                                }
+                            },
+                            {
+                                name:  'locales',
+                                test: /[\\/]src[\\/]locales[\\/]/i
+                            }
+                        ]
                     }
                 },
                 treeshake: false

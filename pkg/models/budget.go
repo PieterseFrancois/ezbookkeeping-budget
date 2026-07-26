@@ -64,6 +64,23 @@ type SavingsActualsResponse struct {
 	Items []*SavingsCategoryActual `json:"items"`
 }
 
+// BudgetExpenseIncomeActualsGetRequest represents the request for budget expense/income actuals
+type BudgetExpenseIncomeActualsGetRequest struct {
+	StartTime int64 `form:"startTime" binding:"required,min=1"`
+	EndTime   int64 `form:"endTime" binding:"required,min=1"`
+}
+
+// BudgetCategoryActualItem represents actual amount for a single category
+type BudgetCategoryActualItem struct {
+	CategoryId int64 `json:"categoryId,string"`
+	Amount     int64 `json:"amount"`
+}
+
+// BudgetExpenseIncomeActualsResponse represents the response for budget expense/income actuals
+type BudgetExpenseIncomeActualsResponse struct {
+	Items []*BudgetCategoryActualItem `json:"items"`
+}
+
 // ToInfoResponse returns a view-object according to database model
 func (b *BudgetTarget) ToInfoResponse() *BudgetTargetInfoResponse {
 	return &BudgetTargetInfoResponse{

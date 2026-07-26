@@ -1078,13 +1078,10 @@ function cancelEdit(): void {
 // ---------- Data loading ----------
 
 async function loadStatsForMonth(year: number, month: number): Promise<void> {
-    const resp = await services.getTransactionStatistics({
-        startTime: cycleFirstUnixTime(year, month),
-        endTime: cycleLastUnixTime(year, month),
-        tagFilter: '',
-        keyword: '',
-        useTransactionTimezone: false,
-    });
+    const resp = await services.getBudgetExpenseIncomeActuals(
+        cycleFirstUnixTime(year, month),
+        cycleLastUnixTime(year, month)
+    );
     const items = resp.data?.result?.items ?? [];
     const monthActual: Record<string, number> = {};
     for (const item of items) {

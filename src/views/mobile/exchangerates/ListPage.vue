@@ -8,7 +8,7 @@
             </f7-nav-right>
         </f7-navbar>
 
-        <f7-list strong inset dividers class="margin-vertical" v-if="exchangeRatesData && exchangeRatesData.exchangeRates && exchangeRatesData.exchangeRates.length">
+        <f7-list strong inset dividers class="margin-vertical-half" v-if="exchangeRatesData && exchangeRatesData.exchangeRates && exchangeRatesData.exchangeRates.length">
             <f7-list-item
                 class="list-item-with-header-and-title list-item-no-item-after"
                 link="#"
@@ -50,7 +50,7 @@
             </f7-list-item>
         </f7-list>
 
-        <f7-list strong inset dividers class="margin-vertical" v-if="!exchangeRatesData || !exchangeRatesData.exchangeRates || !exchangeRatesData.exchangeRates.length">
+        <f7-list strong inset dividers class="margin-vertical-half" v-if="!exchangeRatesData || !exchangeRatesData.exchangeRates || !exchangeRatesData.exchangeRates.length">
             <f7-list-item :title="tt('No exchange rates data')"></f7-list-item>
         </f7-list>
 
@@ -189,7 +189,9 @@ const textDirection = computed<TextDirection>(() => getCurrentLanguageTextDirect
 const numeralSystem = computed<NumeralSystem>(() => getCurrentNumeralSystemType());
 const displayBaseAmount = computed<string>(() => formatAmountToLocalizedNumerals(baseAmount.value, baseCurrency.value));
 const baseAmountFontSizeClass = computed<string>(() => {
-    if (baseAmount.value >= 100000000 || baseAmount.value <= -100000000) {
+    if (baseAmount.value >= 10000000000 || baseAmount.value <= -10000000000) {
+        return 'ebk-extra-small-amount';
+    } else if (baseAmount.value >= 100000000 || baseAmount.value <= -100000000) {
         return 'ebk-small-amount';
     } else if (baseAmount.value >= 1000000 || baseAmount.value <= -1000000) {
         return 'ebk-normal-amount';

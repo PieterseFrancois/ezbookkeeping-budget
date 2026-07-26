@@ -48,7 +48,7 @@ func (s *BudgetService) GetSavingsActuals(c core.Context, uid int64, year int, m
 
 	var transactions []*models.Transaction
 	err = s.UserDataDB(uid).NewSession(c).
-		Select("category_id, amount, account_id").
+		Select("transaction_id, category_id, amount, account_id").
 		Where("uid=? AND deleted=? AND transaction_time>=? AND transaction_time<=?",
 			uid, false, minTransactionTime, maxTransactionTime).
 		In("type", models.TRANSACTION_DB_TYPE_TRANSFER_OUT).
@@ -61,6 +61,31 @@ func (s *BudgetService) GetSavingsActuals(c core.Context, uid int64, year int, m
 
 	if len(transactions) == 0 {
 		return []*models.SavingsCategoryActual{}, nil
+	}
+
+	// Filter out transactions excluded from budget calculations
+	txIds := make([]int64, len(transactions))
+	for i, t := range transactions {
+		txIds[i] = t.TransactionId
+	}
+
+	excluded, err := TransactionBudgetOverrides.GetExcludedTransactionIds(c, uid, txIds)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(excluded) > 0 {
+		filtered := transactions[:0]
+		for _, t := range transactions {
+			if !excluded[t.TransactionId] {
+				filtered = append(filtered, t)
+			}
+		}
+		transactions = filtered
+
+		if len(transactions) == 0 {
+			return []*models.SavingsCategoryActual{}, nil
+		}
 	}
 
 	// Collect unique source account IDs to classify contributions vs withdrawals
@@ -116,6 +141,58 @@ func (s *BudgetService) GetSavingsActuals(c core.Context, uid int64, year int, m
 	for _, actual := range resultMap {
 		actual.Net = actual.TransferOut - actual.TransferIn
 		result = append(result, actual)
+	}
+
+	return result, nil
+}
+
+// GetExpenseIncomeActuals returns actual expense and income amounts grouped by category for the given time range,
+// filtered to exclude transactions marked as excluded from budget.
+func (s *BudgetService) GetExpenseIncomeActuals(c core.Context, uid int64, startTime int64, endTime int64) ([]*models.BudgetCategoryActualItem, error) {
+	if uid <= 0 {
+		return nil, errs.ErrUserIdInvalid
+	}
+
+	minTransactionTime := utils.GetMinTransactionTimeFromUnixTime(startTime)
+	maxTransactionTime := utils.GetMaxTransactionTimeFromUnixTime(endTime)
+
+	var transactions []*models.Transaction
+	err := s.UserDataDB(uid).NewSession(c).
+		Select("transaction_id, category_id, amount").
+		Where("uid=? AND deleted=? AND transaction_time>=? AND transaction_time<=?",
+			uid, false, minTransactionTime, maxTransactionTime).
+		In("type", models.TRANSACTION_DB_TYPE_EXPENSE, models.TRANSACTION_DB_TYPE_INCOME).
+		Find(&transactions)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(transactions) == 0 {
+		return []*models.BudgetCategoryActualItem{}, nil
+	}
+
+	txIds := make([]int64, len(transactions))
+	for i, t := range transactions {
+		txIds[i] = t.TransactionId
+	}
+
+	excluded, err := TransactionBudgetOverrides.GetExcludedTransactionIds(c, uid, txIds)
+	if err != nil {
+		return nil, err
+	}
+
+	totals := make(map[int64]int64)
+	for _, t := range transactions {
+		if excluded[t.TransactionId] {
+			continue
+		}
+		totals[t.CategoryId] += t.Amount
+	}
+
+	result := make([]*models.BudgetCategoryActualItem, 0, len(totals))
+	for catId, amount := range totals {
+		result = append(result, &models.BudgetCategoryActualItem{CategoryId: catId, Amount: amount})
 	}
 
 	return result, nil

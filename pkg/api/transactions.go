@@ -31,12 +31,13 @@ const pageCountForMovingAccountTransactions = 1000
 type TransactionsApi struct {
 	ApiUsingConfig
 	ApiUsingDuplicateChecker
-	transactions          *services.TransactionService
-	transactionCategories *services.TransactionCategoryService
-	transactionTags       *services.TransactionTagService
-	transactionPictures   *services.TransactionPictureService
-	accounts              *services.AccountService
-	users                 *services.UserService
+	transactions               *services.TransactionService
+	transactionCategories      *services.TransactionCategoryService
+	transactionTags            *services.TransactionTagService
+	transactionPictures        *services.TransactionPictureService
+	transactionBudgetOverrides *services.TransactionBudgetOverrideService
+	accounts                   *services.AccountService
+	users                      *services.UserService
 }
 
 // Initialize a transaction api singleton instance
@@ -51,12 +52,13 @@ var (
 			},
 			container: duplicatechecker.Container,
 		},
-		transactions:          services.Transactions,
-		transactionCategories: services.TransactionCategories,
-		transactionTags:       services.TransactionTags,
-		transactionPictures:   services.TransactionPictures,
-		accounts:              services.Accounts,
-		users:                 services.Users,
+		transactions:               services.Transactions,
+		transactionCategories:      services.TransactionCategories,
+		transactionTags:            services.TransactionTags,
+		transactionPictures:        services.TransactionPictures,
+		transactionBudgetOverrides: services.TransactionBudgetOverrides,
+		accounts:                   services.Accounts,
+		users:                      services.Users,
 	}
 )
 
@@ -98,7 +100,7 @@ func (a *TransactionsApi) TransactionCountHandler(c *core.WebContext) (any, *err
 		}
 	}
 
-	totalCount, err := a.transactions.GetTransactionCount(c, uid, transactionCountReq.MaxTime, transactionCountReq.MinTime, transactionCountReq.Type, allCategoryIds, allAccountIds, tagFilters, noTags, transactionCountReq.AmountFilter, transactionCountReq.Keyword, transactionCountReq.MustHavePictures)
+	totalCount, err := a.transactions.GetTransactionCount(c, uid, transactionCountReq.MaxTime, transactionCountReq.MinTime, transactionCountReq.Type, allCategoryIds, allAccountIds, tagFilters, noTags, transactionCountReq.AmountFilter, transactionCountReq.Keyword, transactionCountReq.MatchMode, transactionCountReq.MustHavePictures)
 
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionCountHandler] failed to get transaction count for user \"uid:%d\", because %s", uid, err.Error())
@@ -169,7 +171,7 @@ func (a *TransactionsApi) TransactionListHandler(c *core.WebContext) (any, *errs
 	var totalCount int64
 
 	if transactionListReq.WithCount {
-		totalCount, err = a.transactions.GetTransactionCount(c, uid, transactionListReq.MaxTime, transactionListReq.MinTime, transactionListReq.Type, allCategoryIds, allAccountIds, tagFilters, noTags, transactionListReq.AmountFilter, transactionListReq.Keyword, transactionListReq.MustHavePictures)
+		totalCount, err = a.transactions.GetTransactionCount(c, uid, transactionListReq.MaxTime, transactionListReq.MinTime, transactionListReq.Type, allCategoryIds, allAccountIds, tagFilters, noTags, transactionListReq.AmountFilter, transactionListReq.Keyword, transactionListReq.MatchMode, transactionListReq.MustHavePictures)
 
 		if err != nil {
 			log.Errorf(c, "[transactions.TransactionListHandler] failed to get transaction count for user \"uid:%d\", because %s", uid, err.Error())
@@ -177,7 +179,7 @@ func (a *TransactionsApi) TransactionListHandler(c *core.WebContext) (any, *errs
 		}
 	}
 
-	transactions, err := a.transactions.GetTransactionsByMaxTime(c, uid, transactionListReq.MaxTime, transactionListReq.MinTime, transactionListReq.Type, allCategoryIds, allAccountIds, tagFilters, noTags, transactionListReq.AmountFilter, transactionListReq.Keyword, transactionListReq.MustHavePictures, transactionListReq.Page, transactionListReq.Count, true, true)
+	transactions, err := a.transactions.GetTransactionsByMaxTime(c, uid, transactionListReq.MaxTime, transactionListReq.MinTime, transactionListReq.Type, allCategoryIds, allAccountIds, tagFilters, noTags, transactionListReq.AmountFilter, transactionListReq.Keyword, transactionListReq.MatchMode, transactionListReq.MustHavePictures, transactionListReq.Page, transactionListReq.Count, true, true)
 
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionListHandler] failed to get transactions earlier than \"%d\" for user \"uid:%d\", because %s", transactionListReq.MaxTime, uid, err.Error())
@@ -206,6 +208,10 @@ func (a *TransactionsApi) TransactionListHandler(c *core.WebContext) (any, *errs
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionListHandler] failed to assemble transaction result for user \"uid:%d\", because %s", uid, err.Error())
 		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+
+	if err := a.enrichWithBudgetExclusions(c, uid, transactionResult); err != nil {
+		log.Warnf(c, "[transactions.TransactionListHandler] failed to enrich budget overrides for user \"uid:%d\", because %s", uid, err.Error())
 	}
 
 	transactionResps := &models.TransactionInfoPageWrapperResponse{
@@ -277,7 +283,7 @@ func (a *TransactionsApi) TransactionMonthListHandler(c *core.WebContext) (any, 
 		}
 	}
 
-	transactions, err := a.transactions.GetTransactionsInMonthByPage(c, uid, transactionListReq.Year, transactionListReq.Month, transactionListReq.Type, allCategoryIds, allAccountIds, tagFilters, noTags, transactionListReq.AmountFilter, transactionListReq.Keyword, transactionListReq.MustHavePictures)
+	transactions, err := a.transactions.GetTransactionsInMonthByPage(c, uid, transactionListReq.Year, transactionListReq.Month, transactionListReq.Type, allCategoryIds, allAccountIds, tagFilters, noTags, transactionListReq.AmountFilter, transactionListReq.Keyword, transactionListReq.MatchMode, transactionListReq.MustHavePictures)
 
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionMonthListHandler] failed to get transactions in month \"%d-%d\" for user \"uid:%d\", because %s", transactionListReq.Year, transactionListReq.Month, uid, err.Error())
@@ -297,6 +303,10 @@ func (a *TransactionsApi) TransactionMonthListHandler(c *core.WebContext) (any, 
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionMonthListHandler] failed to assemble transaction result for user \"uid:%d\", because %s", uid, err.Error())
 		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+
+	if err := a.enrichWithBudgetExclusions(c, uid, transactionResult); err != nil {
+		log.Warnf(c, "[transactions.TransactionMonthListHandler] failed to enrich budget overrides for user \"uid:%d\", because %s", uid, err.Error())
 	}
 
 	transactionResps := &models.TransactionInfoPageWrapperResponse2{
@@ -372,7 +382,7 @@ func (a *TransactionsApi) TransactionListAllHandler(c *core.WebContext) (any, *e
 		minTransactionTime = utils.GetMinTransactionTimeFromUnixTime(transactionAllListReq.StartTime)
 	}
 
-	allTransactions, err := a.transactions.GetAllSpecifiedTransactions(c, uid, maxTransactionTime, minTransactionTime, transactionAllListReq.Type, allCategoryIds, allAccountIds, tagFilters, noTags, transactionAllListReq.AmountFilter, transactionAllListReq.Keyword, transactionAllListReq.MustHavePictures, pageCountForDataExport, true)
+	allTransactions, err := a.transactions.GetAllSpecifiedTransactions(c, uid, maxTransactionTime, minTransactionTime, transactionAllListReq.Type, allCategoryIds, allAccountIds, tagFilters, noTags, transactionAllListReq.AmountFilter, transactionAllListReq.Keyword, transactionAllListReq.MatchMode, transactionAllListReq.MustHavePictures, pageCountForDataExport, true)
 
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionListAllHandler] failed to get all transactions for user \"uid:%d\", because %s", uid, err.Error())
@@ -402,6 +412,10 @@ func (a *TransactionsApi) TransactionListAllHandler(c *core.WebContext) (any, *e
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionListAllHandler] failed to assemble transaction result for user \"uid:%d\", because %s", uid, err.Error())
 		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+
+	if err := a.enrichWithBudgetExclusions(c, uid, transactionResult); err != nil {
+		log.Warnf(c, "[transactions.TransactionListAllHandler] failed to enrich budget overrides for user \"uid:%d\", because %s", uid, err.Error())
 	}
 
 	return transactionResult, nil
@@ -562,7 +576,7 @@ func (a *TransactionsApi) TransactionStatisticsHandler(c *core.WebContext) (any,
 	}
 
 	uid := c.GetCurrentUid()
-	totalAmounts, err := a.transactions.GetAccountsAndCategoriesTotalInflowAndOutflow(c, uid, statisticReq.StartTime, statisticReq.EndTime, tagFilters, noTags, statisticReq.Keyword, clientTimezone, statisticReq.UseTransactionTimezone)
+	totalAmounts, err := a.transactions.GetAccountsAndCategoriesTotalInflowAndOutflow(c, uid, statisticReq.StartTime, statisticReq.EndTime, tagFilters, noTags, statisticReq.Keyword, statisticReq.MatchMode, clientTimezone, statisticReq.UseTransactionTimezone)
 
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionStatisticsHandler] failed to get accounts and categories total income and expense for user \"uid:%d\", because %s", uid, err.Error())
@@ -630,7 +644,7 @@ func (a *TransactionsApi) TransactionStatisticsTrendsHandler(c *core.WebContext)
 	}
 
 	uid := c.GetCurrentUid()
-	allMonthlyTotalAmounts, err := a.transactions.GetAccountsAndCategoriesMonthlyInflowAndOutflow(c, uid, startYear, startMonth, endYear, endMonth, tagFilters, noTags, statisticTrendsReq.Keyword, clientTimezone, statisticTrendsReq.UseTransactionTimezone)
+	allMonthlyTotalAmounts, err := a.transactions.GetAccountsAndCategoriesMonthlyInflowAndOutflow(c, uid, startYear, startMonth, endYear, endMonth, tagFilters, noTags, statisticTrendsReq.Keyword, statisticTrendsReq.MatchMode, clientTimezone, statisticTrendsReq.UseTransactionTimezone)
 
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionStatisticsTrendsHandler] failed to get accounts and categories total income and expense for user \"uid:%d\", because %s", uid, err.Error())
@@ -999,6 +1013,13 @@ func (a *TransactionsApi) TransactionGetHandler(c *core.WebContext) (any, *errs.
 		transactionResp.Pictures = a.GetTransactionPictureInfoResponseList(pictureInfos)
 	}
 
+	excluded, err := a.transactionBudgetOverrides.IsExcluded(c, uid, transaction.TransactionId)
+	if err != nil {
+		log.Warnf(c, "[transactions.TransactionGetHandler] failed to get budget override for user \"uid:%d\", because %s", uid, err.Error())
+	} else {
+		transactionResp.ExcludeFromBudget = excluded
+	}
+
 	return transactionResp, nil
 }
 
@@ -1209,6 +1230,20 @@ func (a *TransactionsApi) TransactionModifyHandler(c *core.WebContext) (any, *er
 		return nil, errs.ErrTransactionTypeInvalid
 	}
 
+	newTransactionType, err := transactionModifyReq.Type.ToTransactionDbType()
+
+	if err != nil {
+		return nil, errs.ErrTransactionTypeInvalid
+	}
+
+	if (transaction.Type == models.TRANSACTION_DB_TYPE_MODIFY_BALANCE && newTransactionType != models.TRANSACTION_DB_TYPE_MODIFY_BALANCE) ||
+		(transaction.Type != models.TRANSACTION_DB_TYPE_MODIFY_BALANCE && newTransactionType == models.TRANSACTION_DB_TYPE_MODIFY_BALANCE) {
+		log.Warnf(c, "[transactions.TransactionModifyHandler] cannot modify transaction type from \"%d\" to \"%d\"", transaction.Type, newTransactionType)
+		return nil, errs.ErrTransactionTypeInvalid
+	}
+
+	changeToTransfer := newTransactionType == models.TRANSACTION_DB_TYPE_TRANSFER_OUT && transaction.Type != models.TRANSACTION_DB_TYPE_TRANSFER_OUT
+
 	if transaction.Type == models.TRANSACTION_DB_TYPE_MODIFY_BALANCE && transactionModifyReq.CategoryId != 0 {
 		log.Warnf(c, "[transactions.TransactionModifyHandler] balance modification transaction cannot set category id")
 		return nil, errs.ErrBalanceModificationTransactionCannotSetCategory
@@ -1242,6 +1277,7 @@ func (a *TransactionsApi) TransactionModifyHandler(c *core.WebContext) (any, *er
 	newTransaction := &models.Transaction{
 		TransactionId:     transaction.TransactionId,
 		Uid:               uid,
+		Type:              newTransactionType,
 		CategoryId:        transactionModifyReq.CategoryId,
 		TransactionTime:   utils.GetMinTransactionTimeFromUnixTime(transactionModifyReq.Time),
 		TimezoneUtcOffset: transactionModifyReq.UtcOffset,
@@ -1251,7 +1287,7 @@ func (a *TransactionsApi) TransactionModifyHandler(c *core.WebContext) (any, *er
 		Comment:           transactionModifyReq.Comment,
 	}
 
-	if transaction.Type == models.TRANSACTION_DB_TYPE_TRANSFER_OUT {
+	if newTransaction.Type == models.TRANSACTION_DB_TYPE_TRANSFER_OUT {
 		newTransaction.RelatedAccountId = transactionModifyReq.DestinationAccountId
 		newTransaction.RelatedAccountAmount = transactionModifyReq.DestinationAmount
 	}
@@ -1261,13 +1297,14 @@ func (a *TransactionsApi) TransactionModifyHandler(c *core.WebContext) (any, *er
 		newTransaction.GeoLatitude = transactionModifyReq.GeoLocation.Latitude
 	}
 
-	if newTransaction.CategoryId == transaction.CategoryId &&
+	if newTransaction.Type == transaction.Type &&
+		newTransaction.CategoryId == transaction.CategoryId &&
 		utils.GetUnixTimeFromTransactionTime(newTransaction.TransactionTime) == utils.GetUnixTimeFromTransactionTime(transaction.TransactionTime) &&
 		newTransaction.TimezoneUtcOffset == transaction.TimezoneUtcOffset &&
 		newTransaction.AccountId == transaction.AccountId &&
 		newTransaction.Amount == transaction.Amount &&
-		(transaction.Type != models.TRANSACTION_DB_TYPE_TRANSFER_OUT || newTransaction.RelatedAccountId == transaction.RelatedAccountId) &&
-		(transaction.Type != models.TRANSACTION_DB_TYPE_TRANSFER_OUT || newTransaction.RelatedAccountAmount == transaction.RelatedAccountAmount) &&
+		(newTransaction.Type != models.TRANSACTION_DB_TYPE_TRANSFER_OUT || newTransaction.RelatedAccountId == transaction.RelatedAccountId) &&
+		(newTransaction.Type != models.TRANSACTION_DB_TYPE_TRANSFER_OUT || newTransaction.RelatedAccountAmount == transaction.RelatedAccountAmount) &&
 		newTransaction.HideAmount == transaction.HideAmount &&
 		newTransaction.Comment == transaction.Comment &&
 		newTransaction.GeoLongitude == transaction.GeoLongitude &&
@@ -1338,7 +1375,7 @@ func (a *TransactionsApi) TransactionModifyHandler(c *core.WebContext) (any, *er
 		}
 	}
 
-	err = a.transactions.ModifyTransaction(c, newTransaction, len(transactionTagIds), addTransactionTagIds, removeTransactionTagIds, addTransactionPictureIds, removeTransactionPictureIds)
+	err = a.transactions.ModifyTransaction(c, newTransaction, changeToTransfer, len(transactionTagIds), addTransactionTagIds, removeTransactionTagIds, addTransactionPictureIds, removeTransactionPictureIds)
 
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionModifyHandler] failed to update transaction \"id:%d\" for user \"uid:%d\", because %s", transactionModifyReq.Id, uid, err.Error())
@@ -1347,9 +1384,15 @@ func (a *TransactionsApi) TransactionModifyHandler(c *core.WebContext) (any, *er
 
 	log.Infof(c, "[transactions.TransactionModifyHandler] user \"uid:%d\" has updated transaction \"id:%d\" successfully", uid, transactionModifyReq.Id)
 
-	newTransaction.Type = transaction.Type
 	newTransactionResp := newTransaction.ToTransactionInfoResponse(tagIds, transactionEditable)
 	newTransactionResp.Pictures = a.GetTransactionPictureInfoResponseList(newPictureInfos)
+
+	excluded, err := a.transactionBudgetOverrides.IsExcluded(c, uid, newTransaction.TransactionId)
+	if err != nil {
+		log.Warnf(c, "[transactions.TransactionModifyHandler] failed to get budget override for user \"uid:%d\", because %s", uid, err.Error())
+	} else {
+		newTransactionResp.ExcludeFromBudget = excluded
+	}
 
 	return newTransactionResp, nil
 }
@@ -1603,7 +1646,7 @@ func (a *TransactionsApi) TransactionBatchUpdateAccountsHandler(c *core.WebConte
 			continue
 		}
 
-		err = a.transactions.ModifyTransaction(c, transaction, 0, nil, nil, nil, nil)
+		err = a.transactions.ModifyTransaction(c, transaction, false, 0, nil, nil, nil, nil)
 
 		if err != nil {
 			log.Errorf(c, "[transactions.TransactionBatchUpdateAccountsHandler] failed to update transaction \"id:%d\" for user \"uid:%d\", because %s", transaction.TransactionId, uid, err.Error())
@@ -1990,7 +2033,7 @@ func (a *TransactionsApi) TransactionMoveAllBetweenAccountsHandler(c *core.WebCo
 		return nil, errs.ErrCannotMoveTransactionBetweenAccountsWithDifferentCurrencies
 	}
 
-	transactions, err := a.transactions.GetAllSpecifiedTransactions(c, uid, 0, 0, 0, nil, []int64{fromAccount.AccountId}, nil, false, "", "", false, pageCountForMovingAccountTransactions, true)
+	transactions, err := a.transactions.GetAllSpecifiedTransactions(c, uid, 0, 0, 0, nil, []int64{fromAccount.AccountId}, nil, false, "", "", core.MATCH_MODE_DEFAULT, false, pageCountForMovingAccountTransactions, true)
 
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionMoveAllBetweenAccountsHandler] failed to get all transactions of account \"id:%d\" for user \"uid:%d\", because %s", fromAccount.AccountId, uid, err.Error())
@@ -2286,7 +2329,17 @@ func (a *TransactionsApi) TransactionParseImportFileHandler(c *core.WebContext) 
 		textualOption = textualOptions[0]
 	}
 
-	additionalOptions := converter.ParseImporterOptions(textualOption)
+	additionalOptions := converter.ParseImporterOptions(a.CurrentConfig(), textualOption)
+
+	if fileType == "ai_txt" || fileType == "ai_image" {
+		aiAdditionalPrompts := form.Value["aiPrompt"]
+		aiAdditionalPrompt := ""
+
+		if len(aiAdditionalPrompts) > 0 {
+			aiAdditionalPrompt = aiAdditionalPrompts[0]
+			additionalOptions = additionalOptions.WithAIAdditionalPrompt(aiAdditionalPrompt)
+		}
+	}
 
 	var dataImporter converter.TransactionDataImporter
 
@@ -2390,6 +2443,14 @@ func (a *TransactionsApi) TransactionParseImportFileHandler(c *core.WebContext) 
 		return nil, errs.Or(err, errs.ErrImportFileTypeNotSupported)
 	}
 
+	if fileType == "ai_txt" && (a.CurrentConfig().TextRecognitionLLMConfig == nil || a.CurrentConfig().TextRecognitionLLMConfig.LLMProvider == "" || !a.CurrentConfig().TransactionFromAITextRecognition) {
+		return nil, errs.ErrLargeLanguageModelProviderNotEnabled
+	}
+
+	if fileType == "ai_image" && (a.CurrentConfig().ReceiptImageRecognitionLLMConfig == nil || a.CurrentConfig().ReceiptImageRecognitionLLMConfig.LLMProvider == "" || !a.CurrentConfig().TransactionFromAIImageRecognition) {
+		return nil, errs.ErrLargeLanguageModelProviderNotEnabled
+	}
+
 	importFiles := form.File["file"]
 
 	if len(importFiles) < 1 {
@@ -2402,9 +2463,27 @@ func (a *TransactionsApi) TransactionParseImportFileHandler(c *core.WebContext) 
 		return nil, errs.ErrUploadedFileEmpty
 	}
 
-	if importFiles[0].Size > int64(a.CurrentConfig().MaxImportFileSize) {
-		log.Warnf(c, "[transactions.TransactionParseImportFileHandler] the upload file size \"%d\" exceeds the maximum size \"%d\" of import file for user \"uid:%d\"", importFiles[0].Size, a.CurrentConfig().MaxImportFileSize, uid)
+	maxImportFileSize := int64(a.CurrentConfig().MaxImportFileSize)
+
+	if fileType == "ai_image" {
+		maxImportFileSize = int64(a.CurrentConfig().MaxAIRecognitionPictureFileSize)
+	}
+
+	if importFiles[0].Size > maxImportFileSize {
+		log.Warnf(c, "[transactions.TransactionParseImportFileHandler] the upload file size \"%d\" exceeds the maximum size \"%d\" of import file for user \"uid:%d\"", importFiles[0].Size, maxImportFileSize, uid)
 		return nil, errs.ErrExceedMaxUploadFileSize
+	}
+
+	if fileType == "ai_image" {
+		fileExtension := utils.GetFileNameExtension(importFiles[0].Filename)
+		contentType := utils.GetImageContentType(fileExtension)
+
+		if contentType == "" {
+			log.Warnf(c, "[transactions.TransactionParseImportFileHandler] the file extension \"%s\" of image in request is not supported for user \"uid:%d\"", fileExtension, uid)
+			return nil, errs.ErrImageTypeNotSupported
+		}
+
+		additionalOptions = additionalOptions.WithAIImageContentType(contentType)
 	}
 
 	importFile, err := importFiles[0].Open()
@@ -2433,6 +2512,14 @@ func (a *TransactionsApi) TransactionParseImportFileHandler(c *core.WebContext) 
 	}
 
 	if user.FeatureRestriction.Contains(core.USER_FEATURE_RESTRICTION_TYPE_IMPORT_TRANSACTION) {
+		return nil, errs.ErrNotPermittedToPerformThisAction
+	}
+
+	if fileType == "ai_txt" && user.FeatureRestriction.Contains(core.USER_FEATURE_RESTRICTION_TYPE_CREATE_TRANSACTION_FROM_AI_TEXT_RECOGNITION) {
+		return nil, errs.ErrNotPermittedToPerformThisAction
+	}
+
+	if fileType == "ai_image" && user.FeatureRestriction.Contains(core.USER_FEATURE_RESTRICTION_TYPE_CREATE_TRANSACTION_FROM_AI_IMAGE_RECOGNITION) {
 		return nil, errs.ErrNotPermittedToPerformThisAction
 	}
 
@@ -2916,6 +3003,29 @@ func (a *TransactionsApi) getTransactionResponseListResult(c *core.WebContext, u
 	sort.Sort(result)
 
 	return result, nil
+}
+
+// enrichWithBudgetExclusions populates ExcludeFromBudget on each response item via a single batch query.
+func (a *TransactionsApi) enrichWithBudgetExclusions(c *core.WebContext, uid int64, responses models.TransactionInfoResponseSlice) error {
+	if len(responses) == 0 {
+		return nil
+	}
+
+	txIds := make([]int64, len(responses))
+	for i, r := range responses {
+		txIds[i] = r.Id
+	}
+
+	excluded, err := a.transactionBudgetOverrides.GetExcludedTransactionIds(c, uid, txIds)
+	if err != nil {
+		return err
+	}
+
+	for i := range responses {
+		responses[i].ExcludeFromBudget = excluded[responses[i].Id]
+	}
+
+	return nil
 }
 
 func (a *TransactionsApi) createNewTransactionModel(uid int64, transactionCreateReq *models.TransactionCreateRequest, clientIp string) *models.Transaction {

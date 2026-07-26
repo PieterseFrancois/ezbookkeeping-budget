@@ -183,7 +183,7 @@
         </v-col>
 
         <v-col cols="12">
-            <budget-overview-card :loading="loadingOverview" :budget-summary="budgetSummary" :unbudgeted="unbudgeted"/>
+            <budget-overview-card :loading="loadingOverview" :budget-summary="budgetSummary" :unbudgeted="unbudgeted" :cycle-note="budgetCycleNote"/>
         </v-col>
     </v-row>
 
@@ -206,6 +206,7 @@ import { useHomePageBase } from '@/views/base/HomePageBase.ts';
 import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useOverviewStore } from '@/stores/overview.ts';
+import { useUserStore } from '@/stores/user.ts';
 
 import { DateRange } from '@/core/datetime.ts';
 import { CategoryType } from '@/core/category.ts';
@@ -216,6 +217,7 @@ import {
 } from '@/models/transaction.ts';
 
 import { getUnixTimeBeforeUnixTime, getUnixTimeAfterUnixTime, getThisMonthFirstUnixTime, getThisMonthLastUnixTime } from '@/lib/datetime.ts';
+import { addMonths } from '@/views/base/BudgetPageBase.ts';
 import axios from 'axios';
 import type { ApiResponse } from '@/core/api.ts';
 import services from '@/lib/services.ts';
@@ -256,12 +258,23 @@ const {
 const accountsStore = useAccountsStore();
 const transactionCategoriesStore = useTransactionCategoriesStore();
 const overviewStore = useOverviewStore();
+const userStore = useUserStore();
 
 const snackbar = useTemplateRef<SnackBarType>('snackbar');
 
 const loadingOverview = ref<boolean>(true);
 const budgetSummary = ref<BudgetSummaryItem[]>([]);
 const unbudgeted = ref<UnbudgetedItem[]>([]);
+const cycleYear = ref<number>(new Date().getFullYear());
+const cycleMonth = ref<number>(new Date().getMonth() + 1);
+
+const budgetCycleNote = computed<string>(() => {
+    const endDay = userStore.currentUserBudgetEndDay;
+    if (!endDay) return '';
+    const { month: prevMonth } = addMonths(cycleYear.value, cycleMonth.value, -1);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `Budget cycle: ${endDay + 1} ${monthNames[prevMonth - 1]} – ${endDay} ${monthNames[cycleMonth.value - 1]}`;
+});
 
 interface BudgetTargetRawItem {
     id: string;
@@ -325,14 +338,35 @@ const monthlyIncomeAndExpenseData = computed<TransactionMonthlyIncomeAndExpenseD
 
 async function loadBudgetOverview(): Promise<void> {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    const startTime = getThisMonthFirstUnixTime();
-    const endTime = getThisMonthLastUnixTime();
+    const calYear = now.getFullYear();
+    const calMonth = now.getMonth() + 1;
+    const endDay = userStore.currentUserBudgetEndDay;
+    let year: number;
+    let month: number;
+    let startTime: number;
+    let endTime: number;
+
+    if (!endDay) {
+        year = calYear;
+        month = calMonth;
+        startTime = getThisMonthFirstUnixTime();
+        endTime = getThisMonthLastUnixTime();
+    } else {
+        // If today has passed endDay, we're already in the next cycle
+        const resolved = now.getDate() > endDay ? addMonths(calYear, calMonth, 1) : { year: calYear, month: calMonth };
+        year = resolved.year;
+        month = resolved.month;
+        const { year: prevYear, month: prevMonth } = addMonths(year, month, -1);
+        startTime = Math.floor(new Date(prevYear, prevMonth - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000);
+        endTime = Math.floor(new Date(year, month - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000) - 1;
+    }
+
+    cycleYear.value = year;
+    cycleMonth.value = month;
 
     const [budgetResp, statsResp, savingsResp] = await Promise.all([
         axios.get<ApiResponse<BudgetTargetRawItem[]>>(`v1/budget/targets.json?year=${year}&month=${month}`),
-        services.getTransactionStatistics({ startTime, endTime, tagFilter: '', keyword: '', useTransactionTimezone: false }),
+        services.getTransactionStatistics({ startTime, endTime, tagFilter: '', keyword: '', useTransactionTimezone: false, matchMode: 0 }),
         axios.get<ApiResponse<{ items: SavingsActualRawItem[] }>>(`v1/budget/savings-actuals.json?year=${year}&month=${month}`)
     ]);
 

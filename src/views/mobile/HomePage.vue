@@ -163,7 +163,7 @@
             </f7-list-item>
         </f7-list>
 
-        <budget-overview-card :loading="loadingBudget" :budget-summary="budgetSummary" :unbudgeted="unbudgeted" />
+        <budget-overview-card :loading="loadingBudget" :budget-summary="budgetSummary" :unbudgeted="unbudgeted" :cycle-note="budgetCycleNote" />
 
         <f7-toolbar tabbar icons bottom class="main-tabbar">
             <f7-link class="link" href="/transaction/list">
@@ -174,6 +174,7 @@
                 <f7-icon f7="creditcard"></f7-icon>
                 <span class="tabbar-label">{{ tt('Accounts') }}</span>
             </f7-link>
+            <!-- "homepage-add-button" must have the "dragenabled" class, otherwise the popover disappears immediately after the second long press -->
             <f7-link id="homepage-add-button" class="link dragenabled"
                      href="/transaction/add" @taphold="openTransactionTemplatePopover">
                 <f7-icon f7="plus_square" class="ebk-tarbar-big-icon"></f7-icon>
@@ -194,16 +195,24 @@
 
         <f7-popover class="template-popover-menu" target-el="#homepage-add-button"
                     v-model:opened="showTransactionTemplatePopover">
-            <f7-list dividers v-if="allTransactionTemplates">
-                <f7-list-item key="AIImageRecognition" link="#" no-chevron
+            <f7-list dividers v-if="isTransactionFromAITextRecognitionEnabled() || isTransactionFromAIImageRecognitionEnabled() || (allTransactionTemplates && allTransactionTemplates.length)">
+                <f7-list-item key="AIClipboardTextRecognition" link="#" no-chevron popover-close
+                              :title="tt('AI Clipboard Text Recognition')"
+                              @click="addByRecognizingClipboardText"
+                              v-if="isTransactionFromAITextRecognitionEnabled()">
+                    <template #media>
+                        <f7-icon f7="wand_stars"></f7-icon>
+                    </template>
+                </f7-list-item>
+                <f7-list-item key="AIImageRecognition" link="#" no-chevron popover-close
                               :title="tt('AI Image Recognition')"
-                              @click="showAIReceiptImageRecognitionSheet = true; showTransactionTemplatePopover = false"
+                              @click="showAIReceiptImageRecognitionSheet = true"
                               v-if="isTransactionFromAIImageRecognitionEnabled()">
                     <template #media>
                         <f7-icon f7="wand_stars"></f7-icon>
                     </template>
                 </f7-list-item>
-                <f7-list-item :key="template.id" :title="template.name"
+                <f7-list-item popover-close :key="template.id" :title="template.name"
                               :link="'/transaction/add?templateId=' + template.id"
                               v-for="template in allTransactionTemplates">
                     <template #media>
@@ -220,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import AIImageRecognitionSheet from '@/components/mobile/AIImageRecognitionSheet.vue';
+import AIImageRecognitionSheet, { type AIImageRecognitionResult } from '@/components/mobile/AIImageRecognitionSheet.vue';
 import BudgetOverviewCard, { type BudgetSummaryItem, type UnbudgetedItem } from '@/views/mobile/budget/BudgetOverviewCard.vue';
 
 import { ref, computed, useTemplateRef } from 'vue';
@@ -228,26 +237,33 @@ import type { Router } from 'framework7/types';
 import axios from 'axios';
 
 import { useI18n } from '@/locales/helpers.ts';
-import { useI18nUIComponents } from '@/lib/ui/mobile.ts';
+import { useI18nUIComponents, isiOS } from '@/lib/ui/mobile.ts';
 import { useHomePageBase } from '@/views/base/HomePageBase.ts';
 
+import { useSettingsStore } from '@/stores/setting.ts';
 import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useTransactionTemplatesStore } from '@/stores/transactionTemplate.ts';
 import { useOverviewStore } from '@/stores/overview.ts';
+import { useUserStore } from '@/stores/user.ts';
 
 import { DateRange } from '@/core/datetime.ts';
 import { CategoryType } from '@/core/category.ts';
 import { TemplateType } from '@/core/template.ts';
 import { TransactionTemplate } from '@/models/transaction_template.ts';
-import type { RecognizedReceiptImageResponse } from '@/models/large_language_model.ts';
 import type { ApiResponse } from '@/core/api.ts';
 import services from '@/lib/services.ts';
 
+import { isFunction } from '@/lib/common.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 import { getShareCacheImageBlob } from '@/lib/cache.ts';
 import { getThisMonthFirstUnixTime, getThisMonthLastUnixTime } from '@/lib/datetime.ts';
-import { isTransactionFromAIImageRecognitionEnabled } from '@/lib/server_settings.ts';
+import { addMonths } from '@/views/base/BudgetPageBase.ts';
+import {
+    isTransactionFromAITextRecognitionEnabled,
+    isTransactionFromAIImageRecognitionEnabled
+} from '@/lib/server_settings.ts';
+import logger from '@/lib/logger.ts';
 
 type AIImageRecognitionSheetType = InstanceType<typeof AIImageRecognitionSheet>;
 
@@ -266,10 +282,12 @@ const {
     getDisplayExpenseAmount
 } = useHomePageBase();
 
+const settingsStore = useSettingsStore();
 const accountsStore = useAccountsStore();
 const transactionCategoriesStore = useTransactionCategoriesStore();
 const transactionTemplatesStore = useTransactionTemplatesStore();
 const overviewStore = useOverviewStore();
+const userStore = useUserStore();
 
 const aiImageRecognitionSheet = useTemplateRef<AIImageRecognitionSheetType>('aiImageRecognitionSheet');
 
@@ -280,6 +298,16 @@ const showAIReceiptImageRecognitionSheet = ref<boolean>(false);
 
 const budgetSummary = ref<BudgetSummaryItem[]>([]);
 const unbudgeted = ref<UnbudgetedItem[]>([]);
+const cycleYear = ref<number>(new Date().getFullYear());
+const cycleMonth = ref<number>(new Date().getMonth() + 1);
+
+const budgetCycleNote = computed<string>(() => {
+    const endDay = userStore.currentUserBudgetEndDay;
+    if (!endDay) return '';
+    const { month: prevMonth } = addMonths(cycleYear.value, cycleMonth.value, -1);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `Budget cycle: ${endDay + 1} ${monthNames[prevMonth - 1]} – ${endDay} ${monthNames[cycleMonth.value - 1]}`;
+});
 
 interface BudgetTargetRawItem {
     id: string;
@@ -298,14 +326,35 @@ interface SavingsActualRawItem {
 
 async function loadBudgetOverview(): Promise<void> {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    const startTime = getThisMonthFirstUnixTime();
-    const endTime = getThisMonthLastUnixTime();
+    const calYear = now.getFullYear();
+    const calMonth = now.getMonth() + 1;
+    const endDay = userStore.currentUserBudgetEndDay;
+    let year: number;
+    let month: number;
+    let startTime: number;
+    let endTime: number;
+
+    if (!endDay) {
+        year = calYear;
+        month = calMonth;
+        startTime = getThisMonthFirstUnixTime();
+        endTime = getThisMonthLastUnixTime();
+    } else {
+        // If today has passed endDay, we're already in the next cycle
+        const resolved = now.getDate() > endDay ? addMonths(calYear, calMonth, 1) : { year: calYear, month: calMonth };
+        year = resolved.year;
+        month = resolved.month;
+        const { year: prevYear, month: prevMonth } = addMonths(year, month, -1);
+        startTime = Math.floor(new Date(prevYear, prevMonth - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000);
+        endTime = Math.floor(new Date(year, month - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000) - 1;
+    }
+
+    cycleYear.value = year;
+    cycleMonth.value = month;
 
     const [budgetResp, statsResp, savingsResp] = await Promise.all([
         axios.get<ApiResponse<BudgetTargetRawItem[]>>(`v1/budget/targets.json?year=${year}&month=${month}`),
-        services.getTransactionStatistics({ startTime, endTime, tagFilter: '', keyword: '', useTransactionTimezone: false }),
+        services.getTransactionStatistics({ startTime, endTime, tagFilter: '', keyword: '', useTransactionTimezone: false, matchMode: 0 }),
         axios.get<ApiResponse<{ items: SavingsActualRawItem[] }>>(`v1/budget/savings-actuals.json?year=${year}&month=${month}`)
     ]);
 
@@ -384,7 +433,7 @@ const allTransactionTemplates = computed<TransactionTemplate[]>(() => {
 });
 
 function openTransactionTemplatePopover(): void {
-    if (isTransactionFromAIImageRecognitionEnabled() || (allTransactionTemplates.value && allTransactionTemplates.value.length)) {
+    if (isTransactionFromAITextRecognitionEnabled() || isTransactionFromAIImageRecognitionEnabled() || (allTransactionTemplates.value && allTransactionTemplates.value.length)) {
         showTransactionTemplatePopover.value = true;
     }
 }
@@ -438,48 +487,80 @@ function reload(done?: () => void): void {
     });
 }
 
-function onReceiptRecognitionChanged(result: RecognizedReceiptImageResponse): void {
+function addByRecognizingClipboardText(): void {
+    if (navigator.clipboard && isFunction(navigator.clipboard.readText) && !isiOS()) {
+        navigator.clipboard.readText().then(text => {
+            const clipboardText = text && text.trim() ? text.trim() : '';
+            props.f7router.navigate('/transaction/add', {
+                props: {
+                    autoRecognizeClipboardText: clipboardText,
+                }
+            });
+        }).catch(error => {
+            logger.error('failed to read clipboard', error);
+            props.f7router.navigate('/transaction/add', {
+                props: {
+                    autoRecognizeClipboardText: '',
+                }
+            });
+        });
+    } else {
+        props.f7router.navigate('/transaction/add', {
+            props: {
+                autoRecognizeClipboardText: '',
+            }
+        });
+    }
+}
+
+function onReceiptRecognitionChanged(result: AIImageRecognitionResult): void {
+    const recognizedResponse = result.response;
+    const autoUploadRecognizedImage = settingsStore.appSettings.autoUploadTransactionPictureForAIRecognition;
     const params: string[] = [];
 
-    if (result.type) {
-        params.push(`type=${result.type}`);
+    if (recognizedResponse.type) {
+        params.push(`type=${recognizedResponse.type}`);
     }
 
-    if (result.time) {
-        params.push(`time=${result.time}`);
+    if (recognizedResponse.time) {
+        params.push(`time=${recognizedResponse.time}`);
     }
 
-    if (result.categoryId) {
-        params.push(`categoryId=${result.categoryId}`);
+    if (recognizedResponse.categoryId) {
+        params.push(`categoryId=${recognizedResponse.categoryId}`);
     }
 
-    if (result.sourceAccountId) {
-        params.push(`accountId=${result.sourceAccountId}`);
+    if (recognizedResponse.sourceAccountId) {
+        params.push(`accountId=${recognizedResponse.sourceAccountId}`);
     }
 
-    if (result.destinationAccountId) {
-        params.push(`destinationAccountId=${result.destinationAccountId}`);
+    if (recognizedResponse.destinationAccountId) {
+        params.push(`destinationAccountId=${recognizedResponse.destinationAccountId}`);
     }
 
-    if (result.sourceAmount) {
-        params.push(`amount=${result.sourceAmount}`);
+    if (recognizedResponse.sourceAmount) {
+        params.push(`amount=${recognizedResponse.sourceAmount}`);
     }
 
-    if (result.destinationAmount) {
-        params.push(`destinationAmount=${result.destinationAmount}`);
+    if (recognizedResponse.destinationAmount) {
+        params.push(`destinationAmount=${recognizedResponse.destinationAmount}`);
     }
 
-    if (result.tagIds) {
-        params.push(`tagIds=${result.tagIds.join(',')}`);
+    if (recognizedResponse.tagIds) {
+        params.push(`tagIds=${recognizedResponse.tagIds.join(',')}`);
     }
 
-    if (result.comment) {
-        params.push(`comment=${encodeURIComponent(result.comment)}`);
+    if (recognizedResponse.comment) {
+        params.push(`comment=${encodeURIComponent(recognizedResponse.comment)}`);
     }
 
     params.push(`noTransactionDraft=true`);
 
-    props.f7router.navigate(`/transaction/add?${params.join('&')}`);
+    props.f7router.navigate(`/transaction/add?${params.join('&')}`, {
+        props: {
+            autoUploadPicture: autoUploadRecognizedImage ? result.imageFile : undefined,
+        }
+    });
 }
 
 function onPageAfterIn(): void {

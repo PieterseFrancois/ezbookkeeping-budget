@@ -63,8 +63,13 @@
                                             <v-btn class="ms-3" color="default" variant="outlined"
                                                    :disabled="loading || !canAddTransaction" @click="add()">
                                                 {{ tt('Add') }}
-                                                <v-menu activator="parent" max-height="500" :open-on-hover="true" v-if="isTransactionFromAIImageRecognitionEnabled() || (allTransactionTemplates && allTransactionTemplates.length)">
+                                                <v-menu activator="parent" max-height="500" :open-on-hover="true" v-if="isTransactionFromAITextRecognitionEnabled() || isTransactionFromAIImageRecognitionEnabled() || (allTransactionTemplates && allTransactionTemplates.length)">
                                                     <v-list>
+                                                        <v-list-item key="AIClipboardTextRecognition"
+                                                                     :title="tt('AI Clipboard Text Recognition')"
+                                                                     :prepend-icon="mdiMagicStaff"
+                                                                     v-if="isTransactionFromAITextRecognitionEnabled()"
+                                                                     @click="addByRecognizingClipboardText"></v-list-item>
                                                         <v-list-item key="AIImageRecognition"
                                                                      :title="tt('AI Image Recognition')"
                                                                      :prepend-icon="mdiMagicStaff"
@@ -160,6 +165,9 @@
                                                 </span>
                                                 <span class="text-income ms-2" v-else-if="!loading">
                                                     {{ currentMonthTotalAmount.income }}
+                                                    <v-tooltip activator="parent" v-if="!currentMonthTotalAmount.incomeIsZero && currentMonthTotalAmount.incomeInDefaultCurrency !== currentMonthTotalAmount.income">
+                                                        <span>{{ currentMonthTotalAmount.incomeInDefaultCurrency }}</span>
+                                                    </v-tooltip>
                                                 </span>
                                                 <span class="text-subtitle-1 ms-3">{{ queryAllFilterAccountIdsCount ? tt('Total Outflows') : tt('Total Expense') }}</span>
                                                 <span class="text-expense ms-2" v-if="loading">
@@ -167,6 +175,9 @@
                                                 </span>
                                                 <span class="text-expense ms-2" v-else-if="!loading">
                                                     {{ currentMonthTotalAmount.expense }}
+                                                    <v-tooltip activator="parent" v-if="!currentMonthTotalAmount.expenseIsZero && currentMonthTotalAmount.expenseInDefaultCurrency !== currentMonthTotalAmount.expense">
+                                                        <span>{{ currentMonthTotalAmount.expenseInDefaultCurrency }}</span>
+                                                    </v-tooltip>
                                                 </span>
                                             </div>
                                         </div>
@@ -175,7 +186,7 @@
                                     <v-card-text class="transaction-calendar-container pt-0" v-if="pageType === TransactionListPageType.Calendar.type">
                                         <transaction-calendar day-has-transaction-class="font-weight-bold"
                                                               :readonly="loading" :is-dark-mode="isDarkMode"
-                                                              :default-currency="defaultCurrency"
+                                                              :default-currency="selectedAccountDefaultCurrency"
                                                               :min-date="transactionCalendarMinDate"
                                                               :max-date="transactionCalendarMaxDate"
                                                               :dailyTotalAmounts="currentMonthTransactionData?.dailyTotalAmounts"
@@ -354,12 +365,12 @@
                                                                         <span class="text-sm ms-3">{{ tt(filterType.name) }}</span>
                                                                         <span class="text-sm ms-4" v-if="query.amountFilter && query.amountFilter.startsWith(`${filterType.type}:`) && currentAmountFilterType !== filterType.type">{{ queryAmount }}</span>
                                                                         <amount-input class="transaction-amount-filter-value ms-4" density="compact"
-                                                                                      :currency="defaultCurrency"
+                                                                                      :currency="selectedAccountDefaultCurrency"
                                                                                       v-model="currentAmountFilterValue1"
                                                                                       v-if="currentAmountFilterType === filterType.type"/>
                                                                         <span class="ms-2 me-2" v-if="currentAmountFilterType === filterType.type && filterType.paramCount === 2">~</span>
                                                                         <amount-input class="transaction-amount-filter-value" density="compact"
-                                                                                      :currency="defaultCurrency"
+                                                                                      :currency="selectedAccountDefaultCurrency"
                                                                                       v-model="currentAmountFilterValue2"
                                                                                       v-if="currentAmountFilterType === filterType.type && filterType.paramCount === 2"/>
                                                                         <v-btn class="ms-2" density="compact" color="primary" variant="tonal"
@@ -540,7 +551,7 @@
                                                     </div>
                                                 </td>
                                             </tr>
-                                            <tr class="transaction-table-row-data text-sm cursor-pointer"
+                                            <tr class="transaction-table-row-data cursor-pointer"
                                                 @click="show(transaction)">
                                                 <td class="transaction-table-column-time">
                                                     <div class="d-flex flex-column">
@@ -551,10 +562,21 @@
                                                 </td>
                                                 <td class="transaction-table-column-category">
                                                     <div class="d-flex align-center">
+                                                        <v-badge v-if="transaction.excludeFromBudget && transaction.category && transaction.category.color"
+                                                                 color="warning"
+                                                                 :icon="mdiCashMinus"
+                                                                 floating
+                                                                 location="bottom right"
+                                                                 :offset-x="2"
+                                                                 :offset-y="2">
+                                                            <ItemIcon size="24px" icon-type="category"
+                                                                      :icon-id="transaction.category.icon"
+                                                                      :color="transaction.category.color"></ItemIcon>
+                                                        </v-badge>
                                                         <ItemIcon size="24px" icon-type="category"
                                                                   :icon-id="transaction.category.icon"
                                                                   :color="transaction.category.color"
-                                                                  v-if="transaction.category && transaction.category.color"></ItemIcon>
+                                                                  v-else-if="transaction.category && transaction.category.color"></ItemIcon>
                                                         <v-icon size="24" :icon="mdiPencilBoxOutline" v-else-if="!transaction.category || !transaction.category.color" />
                                                         <span class="ms-2" v-if="transaction.type === TransactionType.ModifyBalance">
                                                             {{ tt('Modify Balance') }}
@@ -570,6 +592,9 @@
                                                 <td class="transaction-table-column-amount" :class="{ 'text-expense': transaction.type === TransactionType.Expense, 'text-income': transaction.type === TransactionType.Income }">
                                                     <div v-if="transaction.sourceAccount">
                                                         <span>{{ getDisplayAmount(transaction) }}</span>
+                                                        <v-tooltip activator="parent" v-if="!transaction.hideAmount && getDisplayAmountCurrency(transaction) !== userDefaultCurrency">
+                                                            {{ getDisplayAmount(transaction, true) }}
+                                                        </v-tooltip>
                                                     </div>
                                                 </td>
                                                 <td class="transaction-table-column-account">
@@ -642,7 +667,7 @@
                                     </v-card-text>
 
                                     <div class="mt-2 mb-4" v-if="pageType === TransactionListPageType.List.type || pageType === TransactionListPageType.Gallery.type">
-                                        <pagination-buttons :totalPageCount="totalPageCount"
+                                        <pagination-buttons :totalPageCount="totalPageCount" :disabled="loading"
                                                             v-model="paginationCurrentPage"></pagination-buttons>
                                     </div>
                                 </v-card>
@@ -740,6 +765,7 @@ import { type Transaction, TransactionTagFilter } from '@/models/transaction.ts'
 import type { TransactionTemplate } from '@/models/transaction_template.ts';
 
 import {
+    isFunction,
     isDefined,
     isObject,
     isString,
@@ -768,7 +794,12 @@ import {
     transactionTypeToCategoryType
 } from '@/lib/category.ts';
 import { allTransactionPictures } from '@/lib/transaction.ts';
-import { isDataExportingEnabled, isDataImportingEnabled, isTransactionFromAIImageRecognitionEnabled } from '@/lib/server_settings.ts';
+import {
+    isDataExportingEnabled,
+    isDataImportingEnabled,
+    isTransactionFromAITextRecognitionEnabled,
+    isTransactionFromAIImageRecognitionEnabled
+} from '@/lib/server_settings.ts';
 import { scrollToSelectedItem, startDownloadFile } from '@/lib/ui/common.ts';
 import logger from '@/lib/logger.ts';
 
@@ -788,7 +819,8 @@ import {
     mdiPound,
     mdiMagicStaff,
     mdiTextBoxOutline,
-    mdiTextBoxEditOutline
+    mdiTextBoxEditOutline,
+    mdiCashMinus
 } from '@mdi/js';
 
 interface TransactionListProps {
@@ -801,7 +833,8 @@ interface TransactionListProps {
     initAccountIds?: string,
     initTagFilter?: string,
     initAmountFilter?: string,
-    initKeyword?: string
+    initKeyword?: string,
+    initMatchMode?: string
 }
 
 const props = defineProps<TransactionListProps>();
@@ -813,8 +846,12 @@ type AIImageRecognitionDialogType = InstanceType<typeof AIImageRecognitionDialog
 type ImportDialogType = InstanceType<typeof ImportDialog>;
 
 interface TransactionListDisplayTotalAmount {
+    incomeIsZero: boolean;
+    expenseIsZero: boolean;
     income: string;
     expense: string;
+    incomeInDefaultCurrency: string;
+    expenseInDefaultCurrency: string;
 }
 
 const router = useRouter();
@@ -836,7 +873,8 @@ const {
     currentCalendarDate,
     firstDayOfWeek,
     fiscalYearStart,
-    defaultCurrency,
+    userDefaultCurrency,
+    selectedAccountDefaultCurrency,
     showTotalAmountInTransactionListPage,
     showTagInTransactionListPage,
     allDateRanges,
@@ -877,6 +915,7 @@ const {
     getDisplayTimezone,
     getDisplayTimeInDefaultTimezone,
     getDisplayAmount,
+    getDisplayAmountCurrency,
     getDisplayMonthTotalAmount,
     getTransactionTypeName,
     getTransactionPictureUrl
@@ -1120,10 +1159,16 @@ const currentMonthTotalAmount = computed<TransactionListDisplayTotalAmount | nul
             return null;
         }
 
-        return {
-            income: getDisplayMonthTotalAmount(transactionData.totalAmount.income, defaultCurrency.value, '', transactionData.totalAmount.incompleteIncome),
-            expense: getDisplayMonthTotalAmount(transactionData.totalAmount.expense, defaultCurrency.value, '', transactionData.totalAmount.incompleteExpense)
+        const displayMonthlyTotalAmount: TransactionListDisplayTotalAmount = {
+            incomeIsZero: transactionData.totalAmount.income === 0,
+            expenseIsZero: transactionData.totalAmount.expense === 0,
+            income: getDisplayMonthTotalAmount(transactionData.totalAmount.income, selectedAccountDefaultCurrency.value, '', transactionData.totalAmount.incompleteIncome),
+            expense: getDisplayMonthTotalAmount(transactionData.totalAmount.expense, selectedAccountDefaultCurrency.value, '', transactionData.totalAmount.incompleteExpense),
+            incomeInDefaultCurrency: getDisplayMonthTotalAmount(transactionData.totalAmount.income, selectedAccountDefaultCurrency.value, '', transactionData.totalAmount.incompleteIncome, true),
+            expenseInDefaultCurrency: getDisplayMonthTotalAmount(transactionData.totalAmount.expense, selectedAccountDefaultCurrency.value, '', transactionData.totalAmount.incompleteExpense, true)
         };
+
+        return displayMonthlyTotalAmount;
     } else {
         return null;
     }
@@ -1187,7 +1232,8 @@ function init(initProps: TransactionListProps): void {
         accountIds: initProps.initAccountIds,
         tagFilter: initProps.initTagFilter,
         amountFilter: initProps.initAmountFilter || '',
-        keyword: initProps.initKeyword || ''
+        keyword: initProps.initKeyword || '',
+        matchMode: initProps.initMatchMode && parseInt(initProps.initMatchMode) >= 0 ? parseInt(initProps.initMatchMode) : undefined
     });
 
     if (initProps.initPageType) {
@@ -1258,7 +1304,7 @@ function reload(force: boolean, init: boolean): void {
                 mustHavePictures: isGalleryMode,
                 withPictures: isGalleryMode,
                 autoExpand: true,
-                defaultCurrency: defaultCurrency.value
+                defaultCurrency: selectedAccountDefaultCurrency.value
             });
         } else {
             return transactionsStore.loadTransactions({
@@ -1269,7 +1315,7 @@ function reload(force: boolean, init: boolean): void {
                 withCount: page <= 1,
                 withPictures: isGalleryMode,
                 autoExpand: true,
-                defaultCurrency: defaultCurrency.value
+                defaultCurrency: selectedAccountDefaultCurrency.value
             });
         }
     }).then(data => {
@@ -1606,7 +1652,7 @@ function changeAmountFilter(filterType: string): void {
     updateUrlWhenChanged(changed);
 }
 
-function add(template?: TransactionTemplate): void {
+function add(template?: TransactionTemplate, autoRecognizeClipboardText?: string): void {
     const currentUnixTime = getCurrentUnixTime();
 
     let newTransactionTime: number | undefined = undefined;
@@ -1625,7 +1671,8 @@ function add(template?: TransactionTemplate): void {
         categoryId: queryAllFilterCategoryIdsCount.value === 1 ? query.value.categoryIds : '',
         accountId: queryAllFilterAccountIdsCount.value === 1 ? query.value.accountIds : '',
         tagIds: objectFieldWithValueToArrayItem(queryAllFilterTagIds.value, true).join(',') || '',
-        template: template
+        template: template,
+        autoRecognizeClipboardText: autoRecognizeClipboardText
     }).then(result => {
         if (result && result.message) {
             snackbar.value?.showMessage(result.message);
@@ -1639,18 +1686,36 @@ function add(template?: TransactionTemplate): void {
     });
 }
 
+function addByRecognizingClipboardText(): void {
+    if (navigator.clipboard && isFunction(navigator.clipboard.readText)) {
+        navigator.clipboard.readText().then(text => {
+            const clipboardText = text && text.trim() ? text.trim() : '';
+            add(undefined, clipboardText);
+        }).catch(error => {
+            logger.error('failed to read clipboard', error);
+            add(undefined, '');
+        });
+    } else {
+        add(undefined, '');
+    }
+}
+
 function addByRecognizingImage(): void {
     aiImageRecognitionDialog.value?.open().then(result => {
+        const recognizedResponse = result.response;
+        const autoUploadRecognizedImage = settingsStore.appSettings.autoUploadTransactionPictureForAIRecognition;
+
         editDialog.value?.open({
-            time: result.time,
-            type: result.type,
-            categoryId: result.categoryId,
-            accountId: result.sourceAccountId,
-            destinationAccountId: result.destinationAccountId,
-            amount: result.sourceAmount,
-            destinationAmount: result.destinationAmount,
-            tagIds: result.tagIds ? result.tagIds.join(',') : undefined,
-            comment: result.comment,
+            time: recognizedResponse.time,
+            type: recognizedResponse.type,
+            categoryId: recognizedResponse.categoryId,
+            accountId: recognizedResponse.sourceAccountId,
+            destinationAccountId: recognizedResponse.destinationAccountId,
+            amount: recognizedResponse.sourceAmount,
+            destinationAmount: recognizedResponse.destinationAmount,
+            tagIds: recognizedResponse.tagIds ? recognizedResponse.tagIds.join(',') : undefined,
+            comment: recognizedResponse.comment,
+            autoUploadPicture: autoUploadRecognizedImage ? result.imageFile : undefined,
             noTransactionDraft: true
         }).then(result => {
             if (result && result.message) {
@@ -1799,7 +1864,8 @@ onBeforeRouteUpdate((to) => {
             initAccountIds: (to.query['accountIds'] as string | null) || undefined,
             initTagFilter: (to.query['tagFilter'] as string | null) || undefined,
             initAmountFilter: (to.query['amountFilter'] as string | null) || undefined,
-            initKeyword: (to.query['keyword'] as string | null) || undefined
+            initKeyword: (to.query['keyword'] as string | null) || undefined,
+            initMatchMode: (to.query['matchMode'] as string | null) || undefined
         });
     } else {
         init({});
@@ -1937,34 +2003,34 @@ init(props);
     font-weight: bold;
 }
 
-.transaction-calendar-container .dp__main .dp__menu {
+.transaction-calendar-container .dp--main .dp--menu {
     --dp-border-radius: 6px;
     --dp-menu-border-color: rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
-.transaction-calendar-container .dp__main .dp__calendar {
+.transaction-calendar-container .dp--main .dp--calendar {
     --dp-border-color: rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
-.transaction-calendar-container .dp__main .dp__calendar .dp__calendar_row {
+.transaction-calendar-container .dp--main .dp--calendar .dp--calendar-row {
     --dp-cell-size: 80px;
     --dp-primary-color: rgba(var(--v-theme-primary), var(--v-activated-opacity));
     --dp-primary-text-color: rgb(var(--v-theme-primary));
 }
 
-.transaction-calendar-container .dp__main.transaction-calendar-with-alternate-date .dp__calendar .dp__calendar_row {
+.transaction-calendar-container .dp--main.transaction-calendar-with-alternate-date .dp--calendar .dp--calendar-row {
     --dp-cell-size: 100px;
 }
 
-.transaction-calendar-container .dp__main .dp__calendar .dp__calendar_row > .dp__calendar_item {
+.transaction-calendar-container .dp--main .dp--calendar .dp--calendar-row > .dp--calendar-item {
     overflow: hidden;
 }
 
-.transaction-calendar-container .dp__main .dp__calendar .dp__calendar_row > .dp__calendar_item .transaction-calendar-daily-amounts > span.transaction-calendar-alternate-date {
+.transaction-calendar-container .dp--main .dp--calendar .dp--calendar-row > .dp--calendar-item .transaction-calendar-daily-amounts > span.transaction-calendar-alternate-date {
     font-size: 0.9rem;
 }
 
-.transaction-calendar-container .dp__main .dp__calendar .dp__calendar_row > .dp__calendar_item .transaction-calendar-daily-amounts > span.transaction-calendar-daily-amount {
+.transaction-calendar-container .dp--main .dp--calendar .dp--calendar-row > .dp--calendar-item .transaction-calendar-daily-amounts > span.transaction-calendar-daily-amount {
     font-size: 0.95rem;
 }
 

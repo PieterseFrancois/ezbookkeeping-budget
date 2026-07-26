@@ -26,6 +26,7 @@ export class Transaction implements TransactionInfoResponse {
     public tagIds: string[];
     public comment: string;
     public editable: boolean;
+    public excludeFromBudget: boolean;
 
     private _pictures?: TransactionPicture[];
     private _geoLocation?: TransactionGeoLocation;
@@ -39,7 +40,7 @@ export class Transaction implements TransactionInfoResponse {
     private _gregorianCalendarDayOfMonth?: number = undefined; // only for displaying transaction in transaction list
     private _displayDayOfWeek?: WeekDay = undefined; // only for displaying transaction in transaction list
 
-    protected constructor(id: string, timeSequenceId: string, type: number, categoryId: string, time: number, timeZone: string | undefined, utcOffset: number, sourceAccountId: string, destinationAccountId: string, sourceAmount: number, destinationAmount: number, hideAmount: boolean, tagIds: string[], comment: string, editable: boolean) {
+    protected constructor(id: string, timeSequenceId: string, type: number, categoryId: string, time: number, timeZone: string | undefined, utcOffset: number, sourceAccountId: string, destinationAccountId: string, sourceAmount: number, destinationAmount: number, hideAmount: boolean, tagIds: string[], comment: string, editable: boolean, excludeFromBudget: boolean = false) {
         this.id = id;
         this.timeSequenceId = timeSequenceId;
         this.type = type;
@@ -54,6 +55,7 @@ export class Transaction implements TransactionInfoResponse {
         this.tagIds = tagIds;
         this.comment = comment;
         this.editable = editable;
+        this.excludeFromBudget = excludeFromBudget;
         this.setCategoryId(categoryId);
     }
 
@@ -254,6 +256,7 @@ export class Transaction implements TransactionInfoResponse {
 
         return {
             id: this.id,
+            type: this.type,
             categoryId: categoryId,
             time: this.time,
             utcOffset: this.utcOffset,
@@ -326,7 +329,8 @@ export class Transaction implements TransactionInfoResponse {
             transactionResponse.hideAmount,
             transactionResponse.tagIds,
             transactionResponse.comment,
-            transactionResponse.editable
+            transactionResponse.editable,
+            transactionResponse.excludeFromBudget ?? false
         );
 
         if (transactionResponse.category) {
@@ -544,6 +548,7 @@ export interface TransactionCreateRequest {
 
 export interface TransactionModifyRequest {
     readonly id: string;
+    readonly type: number;
     readonly categoryId: string;
     readonly time: number;
     readonly utcOffset: number;
@@ -614,6 +619,7 @@ export interface TransactionListByMaxTimeRequest {
     readonly tagFilter: string;
     readonly amountFilter: string;
     readonly keyword: string;
+    readonly matchMode: number;
     readonly mustHavePictures?: boolean;
     readonly withPictures?: boolean;
 }
@@ -627,6 +633,7 @@ export interface TransactionListInMonthByPageRequest {
     readonly tagFilter: string;
     readonly amountFilter: string;
     readonly keyword: string;
+    readonly matchMode: number;
     readonly mustHavePictures?: boolean;
     readonly withPictures?: boolean;
 }
@@ -666,6 +673,12 @@ export interface TransactionInfoResponse {
     readonly comment: string;
     readonly geoLocation?: TransactionGeoLocationResponse;
     readonly editable: boolean;
+    readonly excludeFromBudget: boolean;
+}
+
+export interface TransactionBudgetOverrideSetRequest {
+    readonly transactionId: string;
+    readonly excluded: boolean;
 }
 
 export interface TransactionStatisticRequest {
@@ -673,6 +686,7 @@ export interface TransactionStatisticRequest {
     readonly endTime: number;
     readonly tagFilter: string;
     readonly keyword: string;
+    readonly matchMode: number;
     readonly useTransactionTimezone: boolean;
 }
 
@@ -684,6 +698,7 @@ export interface YearMonthRangeRequest {
 export interface TransactionStatisticTrendsRequest extends YearMonthRangeRequest {
     readonly tagFilter: string;
     readonly keyword: string;
+    readonly matchMode: number;
     readonly useTransactionTimezone: boolean;
 }
 

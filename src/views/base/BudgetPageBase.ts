@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue';
 import axios from 'axios';
 import type { ApiResponse } from '@/core/api.ts';
+import { useUserStore } from '@/stores/user.ts';
 
 const HIDDEN_CATEGORIES_KEY = 'budget_hidden_categories';
 
@@ -51,8 +52,13 @@ export function addMonths(year: number, month: number, delta: number): { year: n
 
 export function useBudgetPageBase() {
     const now = new Date();
-    const selectedYear = ref<number>(now.getFullYear());
-    const selectedMonth = ref<number>(now.getMonth() + 1);
+    const userStore = useUserStore();
+    const endDay = userStore.currentUserBudgetEndDay;
+    const activeMonth = (endDay > 0 && now.getDate() > endDay)
+        ? addMonths(now.getFullYear(), now.getMonth() + 1, 1)
+        : { year: now.getFullYear(), month: now.getMonth() + 1 };
+    const selectedYear = ref<number>(activeMonth.year);
+    const selectedMonth = ref<number>(activeMonth.month);
     const hiddenCategoryIds = ref<Set<string>>(new Set(loadHiddenIds()));
     // budgetTargets: outer key = `${year}-${month}`, inner key = subcategory id
     const budgetTargets = ref<Record<string, Record<string, BudgetTargetEntry>>>({});
