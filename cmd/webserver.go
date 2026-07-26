@@ -474,19 +474,19 @@ func startWebServer(c *core.CliContext) error {
 			apiV1Route.POST("/insights/explorers/delete.json", bindApi(api.InsightsExplorers.InsightsExplorerDeleteHandler, config))
 
 			// Budget Targets
-			apiV1Route.GET("/budget/targets.json", bindApi(api.Budget.BudgetTargetsHandler))
-			apiV1Route.POST("/budget/targets/add.json", bindApi(api.Budget.CreateBudgetTargetHandler))
-			apiV1Route.POST("/budget/targets/modify.json", bindApi(api.Budget.UpdateBudgetTargetHandler))
-			apiV1Route.POST("/budget/targets/delete.json", bindApi(api.Budget.DeleteBudgetTargetHandler))
-			apiV1Route.GET("/budget/savings-actuals.json", bindApi(api.Budget.SavingsActualsHandler))
-			apiV1Route.GET("/budget/expense-income-actuals.json", bindApi(api.Budget.ExpenseIncomeActualsHandler))
-			apiV1Route.POST("/budget/transaction/override/set.json", bindApi(api.Budget.SetTransactionBudgetOverrideHandler))
+			apiV1Route.GET("/budget/targets.json", bindApi(api.Budget.BudgetTargetsHandler, config))
+			apiV1Route.POST("/budget/targets/add.json", bindApi(api.Budget.CreateBudgetTargetHandler, config))
+			apiV1Route.POST("/budget/targets/modify.json", bindApi(api.Budget.UpdateBudgetTargetHandler, config))
+			apiV1Route.POST("/budget/targets/delete.json", bindApi(api.Budget.DeleteBudgetTargetHandler, config))
+			apiV1Route.GET("/budget/savings-actuals.json", bindApi(api.Budget.SavingsActualsHandler, config))
+			apiV1Route.GET("/budget/expense-income-actuals.json", bindApi(api.Budget.ExpenseIncomeActualsHandler, config))
+			apiV1Route.POST("/budget/transaction/override/set.json", bindApi(api.Budget.SetTransactionBudgetOverrideHandler, config))
 
 			// Goals
-			apiV1Route.GET("/goals/list.json", bindApi(api.Goal.GoalsHandler))
-			apiV1Route.POST("/goals/add.json", bindApi(api.Goal.CreateGoalHandler))
-			apiV1Route.POST("/goals/modify.json", bindApi(api.Goal.UpdateGoalHandler))
-			apiV1Route.POST("/goals/delete.json", bindApi(api.Goal.DeleteGoalHandler))
+			apiV1Route.GET("/goals/list.json", bindApi(api.Goal.GoalsHandler, config))
+			apiV1Route.POST("/goals/add.json", bindApi(api.Goal.CreateGoalHandler, config))
+			apiV1Route.POST("/goals/modify.json", bindApi(api.Goal.UpdateGoalHandler, config))
+			apiV1Route.POST("/goals/delete.json", bindApi(api.Goal.DeleteGoalHandler, config))
 
 			// Large Language Models
 			if config.TextRecognitionLLMConfig != nil && config.TextRecognitionLLMConfig.LLMProvider != "" {
