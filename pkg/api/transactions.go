@@ -31,12 +31,13 @@ const pageCountForMovingAccountTransactions = 1000
 type TransactionsApi struct {
 	ApiUsingConfig
 	ApiUsingDuplicateChecker
-	transactions          *services.TransactionService
-	transactionCategories *services.TransactionCategoryService
-	transactionTags       *services.TransactionTagService
-	transactionPictures   *services.TransactionPictureService
-	accounts              *services.AccountService
-	users                 *services.UserService
+	transactions               *services.TransactionService
+	transactionCategories      *services.TransactionCategoryService
+	transactionTags            *services.TransactionTagService
+	transactionPictures        *services.TransactionPictureService
+	transactionBudgetOverrides *services.TransactionBudgetOverrideService
+	accounts                   *services.AccountService
+	users                      *services.UserService
 }
 
 // Initialize a transaction api singleton instance
@@ -51,12 +52,13 @@ var (
 			},
 			container: duplicatechecker.Container,
 		},
-		transactions:          services.Transactions,
-		transactionCategories: services.TransactionCategories,
-		transactionTags:       services.TransactionTags,
-		transactionPictures:   services.TransactionPictures,
-		accounts:              services.Accounts,
-		users:                 services.Users,
+		transactions:               services.Transactions,
+		transactionCategories:      services.TransactionCategories,
+		transactionTags:            services.TransactionTags,
+		transactionPictures:        services.TransactionPictures,
+		transactionBudgetOverrides: services.TransactionBudgetOverrides,
+		accounts:                   services.Accounts,
+		users:                      services.Users,
 	}
 )
 
@@ -208,6 +210,10 @@ func (a *TransactionsApi) TransactionListHandler(c *core.WebContext) (any, *errs
 		return nil, errs.Or(err, errs.ErrOperationFailed)
 	}
 
+	if err := a.enrichWithBudgetExclusions(c, uid, transactionResult); err != nil {
+		log.Warnf(c, "[transactions.TransactionListHandler] failed to enrich budget overrides for user \"uid:%d\", because %s", uid, err.Error())
+	}
+
 	transactionResps := &models.TransactionInfoPageWrapperResponse{
 		Items: transactionResult,
 	}
@@ -297,6 +303,10 @@ func (a *TransactionsApi) TransactionMonthListHandler(c *core.WebContext) (any, 
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionMonthListHandler] failed to assemble transaction result for user \"uid:%d\", because %s", uid, err.Error())
 		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+
+	if err := a.enrichWithBudgetExclusions(c, uid, transactionResult); err != nil {
+		log.Warnf(c, "[transactions.TransactionMonthListHandler] failed to enrich budget overrides for user \"uid:%d\", because %s", uid, err.Error())
 	}
 
 	transactionResps := &models.TransactionInfoPageWrapperResponse2{
@@ -402,6 +412,10 @@ func (a *TransactionsApi) TransactionListAllHandler(c *core.WebContext) (any, *e
 	if err != nil {
 		log.Errorf(c, "[transactions.TransactionListAllHandler] failed to assemble transaction result for user \"uid:%d\", because %s", uid, err.Error())
 		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+
+	if err := a.enrichWithBudgetExclusions(c, uid, transactionResult); err != nil {
+		log.Warnf(c, "[transactions.TransactionListAllHandler] failed to enrich budget overrides for user \"uid:%d\", because %s", uid, err.Error())
 	}
 
 	return transactionResult, nil
@@ -999,6 +1013,13 @@ func (a *TransactionsApi) TransactionGetHandler(c *core.WebContext) (any, *errs.
 		transactionResp.Pictures = a.GetTransactionPictureInfoResponseList(pictureInfos)
 	}
 
+	excluded, err := a.transactionBudgetOverrides.IsExcluded(c, uid, transaction.TransactionId)
+	if err != nil {
+		log.Warnf(c, "[transactions.TransactionGetHandler] failed to get budget override for user \"uid:%d\", because %s", uid, err.Error())
+	} else {
+		transactionResp.ExcludeFromBudget = excluded
+	}
+
 	return transactionResp, nil
 }
 
@@ -1350,6 +1371,13 @@ func (a *TransactionsApi) TransactionModifyHandler(c *core.WebContext) (any, *er
 	newTransaction.Type = transaction.Type
 	newTransactionResp := newTransaction.ToTransactionInfoResponse(tagIds, transactionEditable)
 	newTransactionResp.Pictures = a.GetTransactionPictureInfoResponseList(newPictureInfos)
+
+	excluded, err := a.transactionBudgetOverrides.IsExcluded(c, uid, newTransaction.TransactionId)
+	if err != nil {
+		log.Warnf(c, "[transactions.TransactionModifyHandler] failed to get budget override for user \"uid:%d\", because %s", uid, err.Error())
+	} else {
+		newTransactionResp.ExcludeFromBudget = excluded
+	}
 
 	return newTransactionResp, nil
 }
@@ -2916,6 +2944,29 @@ func (a *TransactionsApi) getTransactionResponseListResult(c *core.WebContext, u
 	sort.Sort(result)
 
 	return result, nil
+}
+
+// enrichWithBudgetExclusions populates ExcludeFromBudget on each response item via a single batch query.
+func (a *TransactionsApi) enrichWithBudgetExclusions(c *core.WebContext, uid int64, responses models.TransactionInfoResponseSlice) error {
+	if len(responses) == 0 {
+		return nil
+	}
+
+	txIds := make([]int64, len(responses))
+	for i, r := range responses {
+		txIds[i] = r.Id
+	}
+
+	excluded, err := a.transactionBudgetOverrides.GetExcludedTransactionIds(c, uid, txIds)
+	if err != nil {
+		return err
+	}
+
+	for i := range responses {
+		responses[i].ExcludeFromBudget = excluded[responses[i].Id]
+	}
+
+	return nil
 }
 
 func (a *TransactionsApi) createNewTransactionModel(uid int64, transactionCreateReq *models.TransactionCreateRequest, clientIp string) *models.Transaction {

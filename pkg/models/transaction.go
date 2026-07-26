@@ -410,6 +410,7 @@ type TransactionInfoResponse struct {
 	Comment              string                                   `json:"comment"`
 	GeoLocation          *TransactionGeoLocationResponse          `json:"geoLocation,omitempty"`
 	Editable             bool                                     `json:"editable"`
+	ExcludeFromBudget    bool                                     `json:"excludeFromBudget"`
 }
 
 // TransactionCountResponse represents transaction count response

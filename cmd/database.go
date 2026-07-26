@@ -181,6 +181,14 @@ func updateAllDatabaseTablesStructure(c *core.CliContext) error {
 
 	log.BootInfof(c, "[database.updateAllDatabaseTablesStructure] budget target table maintained successfully")
 
+	err = datastore.Container.UserDataStore.SyncStructs(new(models.TransactionBudgetOverride))
+
+	if err != nil {
+		return err
+	}
+
+	log.BootInfof(c, "[database.updateAllDatabaseTablesStructure] transaction budget override table maintained successfully")
+
 	err = datastore.Container.UserDataStore.SyncStructs(new(models.Goal))
 
 	if err != nil {

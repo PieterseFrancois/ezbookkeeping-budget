@@ -1083,6 +1083,8 @@ export const useTransactionsStore = defineStore('transactions', () => {
                 return;
             }
 
+            const draftExcludeFromBudget = transaction.excludeFromBudget;
+
             if (!isEdit) {
                 promise = services.addTransaction(transaction.toCreateRequest(clientSessionId));
             } else {
@@ -1101,6 +1103,11 @@ export const useTransactionsStore = defineStore('transactions', () => {
                 }
 
                 const transaction = Transaction.of(data.result);
+                transaction.excludeFromBudget = draftExcludeFromBudget;
+                services.setTransactionBudgetOverride({
+                    transactionId: transaction.id,
+                    excluded: draftExcludeFromBudget
+                }).catch(err => logger.error('failed to set budget override', err));
 
                 if (!isEdit) {
                     if (!transactionListStateInvalid.value) {
@@ -1123,6 +1130,18 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
                 resolve(transaction);
             }).catch(error => {
+                // If the only change was excludeFromBudget, the backend returns NothingWillBeUpdated
+                // (200004) because no core transaction fields changed. Still apply the override.
+                if (isEdit && error.response?.data?.errorCode === 200004) {
+                    services.setTransactionBudgetOverride({
+                        transactionId: transaction.id,
+                        excluded: draftExcludeFromBudget
+                    }).catch(err => logger.error('failed to set budget override', err));
+                    transaction.excludeFromBudget = draftExcludeFromBudget;
+                    resolve(transaction);
+                    return;
+                }
+
                 logger.error('failed to save transaction', error);
 
                 if (error.response && error.response.data && error.response.data.errorMessage) {
@@ -1632,6 +1651,29 @@ export const useTransactionsStore = defineStore('transactions', () => {
         return services.getTransactionPictureUrlWithToken(pictureInfo.originalUrl, disableBrowserCache);
     }
 
+    function setTransactionBudgetOverride({ transactionId, excluded }: { transactionId: string, excluded: boolean }): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+            services.setTransactionBudgetOverride({ transactionId, excluded }).then(response => {
+                const data = response.data;
+
+                if (!data || !data.success || !data.result) {
+                    reject({ message: 'Unable to update budget override' });
+                    return;
+                }
+
+                resolve(true);
+            }).catch(error => {
+                logger.error('failed to set transaction budget override', error);
+
+                if (!error.processed) {
+                    reject({ message: 'Unable to update budget override' });
+                } else {
+                    reject(error);
+                }
+            });
+        });
+    }
+
     function collapseMonthInTransactionList({ monthList, collapse }: { monthList: TransactionMonthList, collapse: boolean }): void {
         if (monthList) {
             monthList.opened = !collapse;
@@ -1682,6 +1724,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
         moveAllTransactionsBetweenAccounts,
         deleteTransaction,
         batchDeleteTransactions,
+        setTransactionBudgetOverride,
         recognizeReceiptImage,
         cancelRecognizeReceiptImage,
         parseImportCustomFile,

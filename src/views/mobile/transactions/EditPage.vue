@@ -422,6 +422,22 @@
                 </template>
             </f7-list-item>
 
+            <f7-list-item accordion-item class="transaction-edit-advanced-budgeting" :title="tt('Advanced Budgeting')">
+                <f7-accordion-content>
+                    <f7-list>
+                        <f7-list-item :title="tt('Exclude from Budget')">
+                            <template #after>
+                                <f7-toggle
+                                    :checked="transaction.excludeFromBudget"
+                                    :disabled="mode === TransactionEditPageMode.View"
+                                    @toggle:change="(val: boolean) => transaction.excludeFromBudget = val"
+                                />
+                            </template>
+                        </f7-list-item>
+                    </f7-list>
+                </f7-accordion-content>
+            </f7-list-item>
+
             <f7-list-input
                 type="textarea"
                 class="transaction-edit-comment"
@@ -1176,6 +1192,7 @@ function quickSave(): void {
     save(AfterSaveAction.GoBack);
 }
 
+
 function pasteAmount(type: 'sourceAmount' | 'destinationAmount'): void {
     if (mode.value === TransactionEditPageMode.View || !isSupportClipboard) {
         return;
@@ -1369,6 +1386,10 @@ init();
 </script>
 
 <style>
+.transaction-edit-advanced-budgeting .accordion-item-content {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .category-separate-icon.icon {
     margin-inline-start: 5px;
     margin-inline-end: 5px;

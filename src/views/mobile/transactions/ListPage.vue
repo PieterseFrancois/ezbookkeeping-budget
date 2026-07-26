@@ -231,7 +231,7 @@
                             <template #inner>
                                 <div class="display-flex no-padding-horizontal">
                                     <div class="item-media">
-                                        <div class="transaction-icon display-flex align-items-center">
+                                        <div class="transaction-icon display-flex align-items-center" style="position: relative;">
                                             <ItemIcon icon-type="category"
                                                       :icon-id="transaction.category.icon"
                                                       :color="transaction.category.color"
@@ -239,6 +239,11 @@
                                             <f7-icon v-else-if="!transaction.category || !transaction.category.color"
                                                      f7="pencil_ellipsis_rectangle">
                                             </f7-icon>
+                                            <f7-badge v-if="transaction.excludeFromBudget"
+                                                      color="orange"
+                                                      style="position: absolute; bottom: -4px; right: -4px; min-width: 14px; height: 14px; font-size: 9px; line-height: 14px;">
+                                                –B
+                                            </f7-badge>
                                         </div>
                                     </div>
                                     <div class="actual-item-inner">

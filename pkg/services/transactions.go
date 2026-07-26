@@ -1900,6 +1900,13 @@ func (s *TransactionService) DeleteTransaction(c core.Context, uid int64, transa
 			return err
 		}
 
+		// Delete budget override rows for this transaction
+		_, err = sess.Where("uid=? AND transaction_id=?", uid, oldTransaction.TransactionId).Delete(&models.TransactionBudgetOverride{})
+
+		if err != nil {
+			return err
+		}
+
 		// Update account table
 		if oldTransaction.Type == models.TRANSACTION_DB_TYPE_MODIFY_BALANCE {
 			if oldTransaction.RelatedAccountAmount != 0 {
@@ -2015,6 +2022,13 @@ func (s *TransactionService) DeleteAllTransactions(c core.Context, uid int64, de
 
 		// Update all transaction pictures to deleted
 		_, err = sess.Cols("deleted", "deleted_unix_time").Where("uid=? AND deleted=?", uid, false).Update(pictureUpdateModel)
+
+		if err != nil {
+			return err
+		}
+
+		// Delete all budget override rows for this user
+		_, err = sess.Where("uid=?", uid).Delete(&models.TransactionBudgetOverride{})
 
 		if err != nil {
 			return err

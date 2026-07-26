@@ -551,10 +551,21 @@
                                                 </td>
                                                 <td class="transaction-table-column-category">
                                                     <div class="d-flex align-center">
+                                                        <v-badge v-if="transaction.excludeFromBudget && transaction.category && transaction.category.color"
+                                                                 color="warning"
+                                                                 :icon="mdiCashMinus"
+                                                                 floating
+                                                                 location="bottom right"
+                                                                 :offset-x="2"
+                                                                 :offset-y="2">
+                                                            <ItemIcon size="24px" icon-type="category"
+                                                                      :icon-id="transaction.category.icon"
+                                                                      :color="transaction.category.color"></ItemIcon>
+                                                        </v-badge>
                                                         <ItemIcon size="24px" icon-type="category"
                                                                   :icon-id="transaction.category.icon"
                                                                   :color="transaction.category.color"
-                                                                  v-if="transaction.category && transaction.category.color"></ItemIcon>
+                                                                  v-else-if="transaction.category && transaction.category.color"></ItemIcon>
                                                         <v-icon size="24" :icon="mdiPencilBoxOutline" v-else-if="!transaction.category || !transaction.category.color" />
                                                         <span class="ms-2" v-if="transaction.type === TransactionType.ModifyBalance">
                                                             {{ tt('Modify Balance') }}
@@ -788,7 +799,8 @@ import {
     mdiPound,
     mdiMagicStaff,
     mdiTextBoxOutline,
-    mdiTextBoxEditOutline
+    mdiTextBoxEditOutline,
+    mdiCashMinus
 } from '@mdi/js';
 
 interface TransactionListProps {

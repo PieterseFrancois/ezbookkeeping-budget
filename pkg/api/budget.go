@@ -10,17 +10,19 @@ import (
 
 // BudgetApi represents budget api
 type BudgetApi struct {
-	budgetTargets         *services.BudgetService
-	transactionCategories *services.TransactionCategoryService
-	users                 *services.UserService
+	budgetTargets            *services.BudgetService
+	transactionCategories    *services.TransactionCategoryService
+	transactionBudgetOverrides *services.TransactionBudgetOverrideService
+	users                    *services.UserService
 }
 
 // Initialize a budget api singleton instance
 var (
 	Budget = &BudgetApi{
-		budgetTargets:         services.BudgetTargets,
-		transactionCategories: services.TransactionCategories,
-		users:                 services.Users,
+		budgetTargets:              services.BudgetTargets,
+		transactionCategories:      services.TransactionCategories,
+		transactionBudgetOverrides: services.TransactionBudgetOverrides,
+		users:                      services.Users,
 	}
 )
 
@@ -66,6 +68,25 @@ func (a *BudgetApi) SavingsActualsHandler(c *core.WebContext) (any, *errs.Error)
 	}
 
 	return &models.SavingsActualsResponse{Items: items}, nil
+}
+
+// ExpenseIncomeActualsHandler returns budget-filtered expense and income actuals for the given time range
+func (a *BudgetApi) ExpenseIncomeActualsHandler(c *core.WebContext) (any, *errs.Error) {
+	var req models.BudgetExpenseIncomeActualsGetRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Warnf(c, "[budget.ExpenseIncomeActualsHandler] parse request failed, because %s", err.Error())
+		return nil, errs.NewIncompleteOrIncorrectSubmissionError(err)
+	}
+
+	uid := c.GetCurrentUid()
+	items, err := a.budgetTargets.GetExpenseIncomeActuals(c, uid, req.StartTime, req.EndTime)
+
+	if err != nil {
+		log.Errorf(c, "[budget.ExpenseIncomeActualsHandler] failed to get expense/income actuals for user \"uid:%d\", because %s", uid, err.Error())
+		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+
+	return &models.BudgetExpenseIncomeActualsResponse{Items: items}, nil
 }
 
 // BudgetTargetsHandler returns budget targets for the given year and month
@@ -172,6 +193,29 @@ func (a *BudgetApi) DeleteBudgetTargetHandler(c *core.WebContext) (any, *errs.Er
 	}
 
 	log.Infof(c, "[budget.DeleteBudgetTargetHandler] user \"uid:%d\" has deleted budget target \"id:%d\"", uid, req.Id)
+
+	return true, nil
+}
+
+// SetTransactionBudgetOverrideHandler adds or removes the budget exclusion flag for a transaction
+func (a *BudgetApi) SetTransactionBudgetOverrideHandler(c *core.WebContext) (any, *errs.Error) {
+	var req models.TransactionBudgetOverrideSetRequest
+	err := c.ShouldBindJSON(&req)
+
+	if err != nil {
+		log.Warnf(c, "[budget.SetTransactionBudgetOverrideHandler] parse request failed, because %s", err.Error())
+		return nil, errs.NewIncompleteOrIncorrectSubmissionError(err)
+	}
+
+	uid := c.GetCurrentUid()
+	err = a.transactionBudgetOverrides.SetExclusion(c, uid, req.TransactionId, req.Excluded)
+
+	if err != nil {
+		log.Errorf(c, "[budget.SetTransactionBudgetOverrideHandler] failed to set budget override for user \"uid:%d\" transaction \"id:%d\", because %s", uid, req.TransactionId, err.Error())
+		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+
+	log.Infof(c, "[budget.SetTransactionBudgetOverrideHandler] user \"uid:%d\" set budget exclusion for transaction \"id:%d\" to %v", uid, req.TransactionId, req.Excluded)
 
 	return true, nil
 }

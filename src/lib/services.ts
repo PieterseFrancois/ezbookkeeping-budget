@@ -90,7 +90,8 @@ import type {
     TransactionStatisticAssetTrendsRequest,
     TransactionStatisticAssetTrendsResponseItem,
     TransactionAmountsRequestParams,
-    TransactionAmountsResponse
+    TransactionAmountsResponse,
+    TransactionBudgetOverrideSetRequest
 } from '@/models/transaction.ts';
 import {
     TransactionAmountsRequest
@@ -652,6 +653,12 @@ export default {
     },
     deleteTransaction: (req: TransactionDeleteRequest): ApiResponsePromise<boolean> => {
         return axios.post<ApiResponse<boolean>>('v1/transactions/delete.json', req);
+    },
+    setTransactionBudgetOverride: (req: TransactionBudgetOverrideSetRequest): ApiResponsePromise<boolean> => {
+        return axios.post<ApiResponse<boolean>>('v1/budget/transaction/override/set.json', req);
+    },
+    getBudgetExpenseIncomeActuals: (startTime: number, endTime: number): ApiResponsePromise<{ items: Array<{ categoryId: string; amount: number }> }> => {
+        return axios.get('v1/budget/expense-income-actuals.json', { params: { startTime, endTime } });
     },
     batchDeleteTransaction: (req: TransactionBatchDeleteRequest): ApiResponsePromise<boolean> => {
         return axios.post<ApiResponse<boolean>>('v1/transactions/batch_delete.json', req, {
