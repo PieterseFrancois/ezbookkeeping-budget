@@ -5,15 +5,17 @@ import { useI18n } from '@/locales/helpers.ts';
 import { useSettingsStore } from '@/stores/setting.ts';
 import { useUserStore } from '@/stores/user.ts';
 import { useExplorersStore } from '@/stores/explorer.ts';
+import { useExchangeRatesStore } from '@/stores/exchangeRates.ts';
 
 import { type NameValue, type NameNumeralValue, itemAndIndex } from '@/core/base.ts';
 import type { NumeralSystem } from '@/core/numeral.ts';
-
 import { TransactionType } from '@/core/transaction.ts';
+import { DISPLAY_HIDDEN_AMOUNT } from '@/consts/numeral.ts';
 
 import type { TransactionInsightDataItem } from '@/models/transaction.ts';
-import type { InsightsExplorer} from '@/models/explorer.ts';
+import type { InsightsExplorer } from '@/models/explorer.ts';
 
+import { isNumber } from '@/lib/common.ts';
 import {
     getUtcOffsetByUtcOffsetMinutes,
     getTimezoneOffsetMinutes,
@@ -32,13 +34,14 @@ export function useExplorerDataTablePageBase() {
     const settingsStore = useSettingsStore();
     const userStore = useUserStore();
     const explorersStore = useExplorersStore();
+    const exchangeRatesStore = useExchangeRatesStore();
 
     const currentPage = ref<number>(1);
 
     const numeralSystem = computed<NumeralSystem>(() => getCurrentNumeralSystemType());
     const defaultCurrency = computed<string>(() => userStore.currentUserDefaultCurrency);
 
-    const currentExplorer = computed<InsightsExplorer>(() => explorersStore.currentInsightsExplorer);
+    const currentExploration = computed<InsightsExplorer>(() => explorersStore.currentExploration);
 
     const filteredTransactions = computed<TransactionInsightDataItem[]>(() => explorersStore.filteredTransactionsInDataTable);
 
@@ -50,7 +53,7 @@ export function useExplorerDataTablePageBase() {
             value: ''
         });
 
-        for (const [query, index] of itemAndIndex(currentExplorer.value.queries)) {
+        for (const [query, index] of itemAndIndex(currentExploration.value.queries)) {
             if (query.name) {
                 sources.push({
                     name: query.name,
@@ -83,7 +86,7 @@ export function useExplorerDataTablePageBase() {
     const skeletonData = computed<number[]>(() => {
         const data: number[] = [];
 
-        for (let i = 0; i < currentExplorer.value.countPerPage; i++) {
+        for (let i = 0; i < currentExploration.value.countPerPage; i++) {
             data.push(i);
         }
 
@@ -96,7 +99,7 @@ export function useExplorerDataTablePageBase() {
         }
 
         const count = filteredTransactions.value.length;
-        return Math.ceil(count / currentExplorer.value.countPerPage);
+        return Math.ceil(count / currentExploration.value.countPerPage);
     });
 
     const dataTableHeaders = computed<object[]>(() => {
@@ -116,6 +119,19 @@ export function useExplorerDataTablePageBase() {
         headers.push({ key: 'operation', title: tt('Operation'), sortable: false, nowrap: true, align: 'center' });
         return headers;
     });
+
+    function formatAmount(amount: number, hideAmount: boolean, currencyCode: string, inDefaultCurrency?: boolean): string {
+        if (hideAmount) {
+            return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, currencyCode);
+        }
+
+        if (!inDefaultCurrency || currencyCode === defaultCurrency.value) {
+            return formatAmountToLocalizedNumeralsWithCurrency(amount, currencyCode);
+        } else {
+            const exchangedAmount = exchangeRatesStore.getExchangedAmount(amount, currencyCode, defaultCurrency.value);
+            return isNumber(exchangedAmount) ? formatAmountToLocalizedNumeralsWithCurrency(Math.trunc(exchangedAmount), defaultCurrency.value) : formatAmountToLocalizedNumeralsWithCurrency(amount, currencyCode);
+        }
+    }
 
     function getDisplayDateTime(transaction: TransactionInsightDataItem): string {
         const dateTime = parseDateTimeFromUnixTimeWithTimezoneOffset(transaction.time, transaction.utcOffset);
@@ -165,31 +181,20 @@ export function useExplorerDataTablePageBase() {
         }
     }
 
-    function getDisplaySourceAmount(transaction: TransactionInsightDataItem): string {
-        let currency = defaultCurrency.value;
-
-        if (transaction.sourceAccount) {
-            currency = transaction.sourceAccount.currency;
-        }
-
-        return formatAmountToLocalizedNumeralsWithCurrency(transaction.sourceAmount, currency);
+    function getDisplaySourceAmount(transaction: TransactionInsightDataItem, inDefaultCurrency?: boolean): string {
+        return formatAmount(transaction.sourceAmount, transaction.hideAmount, transaction.sourceAccount?.currency ?? defaultCurrency.value, inDefaultCurrency);
     }
 
-    function getDisplayDestinationAmount(transaction: TransactionInsightDataItem): string {
-        let currency = defaultCurrency.value;
-
-        if (transaction.destinationAccount) {
-            currency = transaction.destinationAccount.currency;
-        }
-
-        return formatAmountToLocalizedNumeralsWithCurrency(transaction.destinationAmount, currency);
+    function getDisplayDestinationAmount(transaction: TransactionInsightDataItem, inDefaultCurrency?: boolean): string {
+        return formatAmount(transaction.destinationAmount, transaction.hideAmount, transaction.destinationAccount?.currency ?? defaultCurrency.value, inDefaultCurrency);
     }
 
     return {
         // states
         currentPage,
         // computed states
-        currentExplorer,
+        defaultCurrency,
+        currentExploration,
         filteredTransactions,
         allDataTableQuerySources,
         allPageCounts,

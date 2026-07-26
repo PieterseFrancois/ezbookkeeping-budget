@@ -45,6 +45,44 @@ export function isBoolean(val: unknown): val is boolean {
     return typeof(val) === 'boolean';
 }
 
+export function isTextualUUID(val: unknown): val is string {
+    if (!isString(val)) {
+        return false;
+    }
+
+    const parts = val.split('-');
+
+    if (parts.length !== 5) {
+        return false;
+    }
+
+    const expectedLengths = [8, 4, 4, 4, 12];
+
+    for (let i = 0; i < parts.length; i++) {
+        if (parts[i]!.length !== expectedLengths[i]) {
+            return false;
+        }
+
+        for (let j = 0; j < parts[i]!.length; j++) {
+            const char = parts[i]![j]!;
+            if (!((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F'))) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+export function isHextualColor(val: unknown): val is string {
+    if (!isString(val)) {
+        return false;
+    }
+
+    const hexColorRegex = /^[0-9a-fA-F]{6}$/;
+    return hexColorRegex.test(val);
+}
+
 export function isYearMonth(val: unknown): val is string {
     if (!isString(val)) {
         return false;

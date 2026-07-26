@@ -5,6 +5,7 @@ import { useI18n } from '@/locales/helpers.ts';
 import { useUserStore } from '@/stores/user.ts';
 import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
+import { useExchangeRatesStore } from '@/stores/exchangeRates.ts';
 
 import type { TypeAndDisplayName } from '@/core/base.ts';
 import type { NumeralSystem } from '@/core/numeral.ts';
@@ -13,6 +14,7 @@ import { TimezoneTypeForStatistics } from '@/core/timezone.ts';
 import { TransactionType } from '@/core/transaction.ts';
 import { StatisticsAnalysisType, ChartDateAggregationType } from '@/core/statistics.ts';
 import { KnownFileType } from '@/core/file.ts';
+import { DISPLAY_HIDDEN_AMOUNT } from '@/consts/numeral.ts';
 
 import type { Account } from '@/models/account.ts';
 import type { TransactionCategory } from '@/models/transaction_category.ts';
@@ -22,7 +24,7 @@ import type {
     TransactionReconciliationStatementResponseWithInfo
 } from '@/models/transaction.ts';
 
-import { replaceAll } from '@/lib/common.ts';
+import { isNumber, replaceAll } from '@/lib/common.ts';
 
 import {
     getUtcOffsetByUtcOffsetMinutes,
@@ -50,6 +52,7 @@ export function useReconciliationStatementPageBase() {
     const userStore = useUserStore();
     const accountsStore = useAccountsStore();
     const transactionCategoriesStore = useTransactionCategoriesStore();
+    const exchangeRatesStore = useExchangeRatesStore();
 
     const accountId = ref<string>('');
     const startTime = ref<number>(0);
@@ -115,30 +118,58 @@ export function useReconciliationStatementPageBase() {
     });
 
     const displayTotalInflows = computed<string>(() => {
-        return formatAmountToLocalizedNumeralsWithCurrency(reconciliationStatements.value?.totalInflows ?? 0, currentAccountCurrency.value);
+        return formatAmount(reconciliationStatements.value?.totalInflows ?? 0, false, currentAccountCurrency.value);
+    });
+
+    const displayTotalInflowsInDefaultCurrency = computed<string>(() => {
+        return formatAmount(reconciliationStatements.value?.totalInflows ?? 0, false, currentAccountCurrency.value, true);
     });
 
     const displayTotalOutflows = computed<string>(() => {
-        return formatAmountToLocalizedNumeralsWithCurrency(reconciliationStatements.value?.totalOutflows ?? 0, currentAccountCurrency.value);
+        return formatAmount(reconciliationStatements.value?.totalOutflows ?? 0, false, currentAccountCurrency.value);
+    });
+
+    const displayTotalOutflowsInDefaultCurrency = computed<string>(() => {
+        return formatAmount(reconciliationStatements.value?.totalOutflows ?? 0, false, currentAccountCurrency.value, true);
     });
 
     const displayTotalBalance = computed<string>(() => {
-        return formatAmountToLocalizedNumeralsWithCurrency((reconciliationStatements?.value?.totalInflows ?? 0) - (reconciliationStatements.value?.totalOutflows ?? 0), currentAccountCurrency.value);
+        return formatAmount((reconciliationStatements?.value?.totalInflows ?? 0) - (reconciliationStatements.value?.totalOutflows ?? 0), false, currentAccountCurrency.value);
+    });
+
+    const displayTotalBalanceInDefaultCurrency = computed<string>(() => {
+        return formatAmount((reconciliationStatements?.value?.totalInflows ?? 0) - (reconciliationStatements.value?.totalOutflows ?? 0), false, currentAccountCurrency.value, true);
     });
 
     const displayOpeningBalance = computed<string>(() => {
         if (isCurrentLiabilityAccount.value) {
-            return formatAmountToLocalizedNumeralsWithCurrency(-(reconciliationStatements?.value?.openingBalance ?? 0), currentAccountCurrency.value);
+            return formatAmount(-(reconciliationStatements?.value?.openingBalance ?? 0), false, currentAccountCurrency.value);
         } else {
-            return formatAmountToLocalizedNumeralsWithCurrency(reconciliationStatements?.value?.openingBalance ?? 0, currentAccountCurrency.value);
+            return formatAmount(reconciliationStatements?.value?.openingBalance ?? 0, false, currentAccountCurrency.value);
+        }
+    });
+
+    const displayOpeningBalanceInDefaultCurrency = computed<string>(() => {
+        if (isCurrentLiabilityAccount.value) {
+            return formatAmount(-(reconciliationStatements?.value?.openingBalance ?? 0), false, currentAccountCurrency.value, true);
+        } else {
+            return formatAmount(reconciliationStatements?.value?.openingBalance ?? 0, false, currentAccountCurrency.value, true);
         }
     });
 
     const displayClosingBalance = computed<string>(() => {
         if (isCurrentLiabilityAccount.value) {
-            return formatAmountToLocalizedNumeralsWithCurrency(-(reconciliationStatements?.value?.closingBalance ?? 0), currentAccountCurrency.value);
+            return formatAmount(-(reconciliationStatements?.value?.closingBalance ?? 0), false, currentAccountCurrency.value);
         } else {
-            return formatAmountToLocalizedNumeralsWithCurrency(reconciliationStatements?.value?.closingBalance ?? 0, currentAccountCurrency.value);
+            return formatAmount(reconciliationStatements?.value?.closingBalance ?? 0, false, currentAccountCurrency.value);
+        }
+    });
+
+    const displayClosingBalanceInDefaultCurrency = computed<string>(() => {
+        if (isCurrentLiabilityAccount.value) {
+            return formatAmount(-(reconciliationStatements?.value?.closingBalance ?? 0), false, currentAccountCurrency.value, true);
+        } else {
+            return formatAmount(reconciliationStatements?.value?.closingBalance ?? 0, false, currentAccountCurrency.value, true);
         }
     });
 
@@ -171,6 +202,19 @@ export function useReconciliationStatementPageBase() {
         };
 
         reconciliationStatements.value = responseWithInfo;
+    }
+
+    function formatAmount(amount: number, hideAmount: boolean, currencyCode: string, inDefaultCurrency?: boolean): string {
+        if (hideAmount) {
+            return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, currencyCode);
+        }
+
+        if (!inDefaultCurrency || currencyCode === defaultCurrency.value) {
+            return formatAmountToLocalizedNumeralsWithCurrency(amount, currencyCode);
+        } else {
+            const exchangedAmount = exchangeRatesStore.getExchangedAmount(amount, currencyCode, defaultCurrency.value);
+            return isNumber(exchangedAmount) ? formatAmountToLocalizedNumeralsWithCurrency(Math.trunc(exchangedAmount), defaultCurrency.value) : formatAmountToLocalizedNumeralsWithCurrency(amount, currencyCode);
+        }
     }
 
     function getDisplayTransactionType(transaction: TransactionReconciliationStatementResponseItemWithInfo): string {
@@ -221,17 +265,15 @@ export function useReconciliationStatementPageBase() {
         return `${formatDateTimeToLongDateTime(dateTime)} (UTC${utcOffset})`;
     }
 
-    function getDisplaySourceAmount(transaction: TransactionReconciliationStatementResponseItemWithInfo): string {
-        const currency = transaction.sourceAccount?.currency ?? defaultCurrency.value;
-        return formatAmountToLocalizedNumeralsWithCurrency(transaction.sourceAmount, currency);
+    function getDisplaySourceAmount(transaction: TransactionReconciliationStatementResponseItemWithInfo, inDefaultCurrency?: boolean): string {
+        return formatAmount(transaction.sourceAmount, transaction.hideAmount, transaction.sourceAccount?.currency ?? defaultCurrency.value, inDefaultCurrency);
     }
 
-    function getDisplayDestinationAmount(transaction: TransactionReconciliationStatementResponseItemWithInfo): string {
-        const currency = transaction.destinationAccount?.currency ?? defaultCurrency.value;
-        return formatAmountToLocalizedNumeralsWithCurrency(transaction.destinationAmount, currency);
+    function getDisplayDestinationAmount(transaction: TransactionReconciliationStatementResponseItemWithInfo, inDefaultCurrency?: boolean): string {
+        return formatAmount(transaction.destinationAmount, transaction.hideAmount, transaction.destinationAccount?.currency ?? defaultCurrency.value, inDefaultCurrency);
     }
 
-    function getDisplayAccountBalance(transaction: TransactionReconciliationStatementResponseItemWithInfo): string {
+    function getDisplayAccountBalance(transaction: TransactionReconciliationStatementResponseItemWithInfo, inDefaultCurrency?: boolean): string {
         let currency = defaultCurrency.value;
         let isLiabilityAccount = false;
 
@@ -246,9 +288,9 @@ export function useReconciliationStatementPageBase() {
         }
 
         if (isLiabilityAccount) {
-            return formatAmountToLocalizedNumeralsWithCurrency(-transaction.accountClosingBalance, currency);
+            return formatAmount(-transaction.accountClosingBalance, false, currency, inDefaultCurrency);
         } else {
-            return formatAmountToLocalizedNumeralsWithCurrency(transaction.accountClosingBalance, currency);
+            return formatAmount(transaction.accountClosingBalance, false, currency, inDefaultCurrency);
         }
     }
 
@@ -341,10 +383,15 @@ export function useReconciliationStatementPageBase() {
         displayStartDateTime,
         displayEndDateTime,
         displayTotalInflows,
+        displayTotalInflowsInDefaultCurrency,
         displayTotalOutflows,
+        displayTotalOutflowsInDefaultCurrency,
         displayTotalBalance,
+        displayTotalBalanceInDefaultCurrency,
         displayOpeningBalance,
+        displayOpeningBalanceInDefaultCurrency,
         displayClosingBalance,
+        displayClosingBalanceInDefaultCurrency,
         // functions
         updatePageOpenTime,
         setReconciliationStatements,

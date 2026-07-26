@@ -14,6 +14,22 @@ import (
 	"github.com/mayswind/ezbookkeeping/pkg/utils"
 )
 
+func TestExchangeRatesApiLatestExchangeRateHandler_CentralBankOfArgentinaDataSource(t *testing.T) {
+	exchangeRateResponse := executeLatestExchangeRateHandler(t, settings.CentralBankOfArgentinaDataSource)
+
+	if exchangeRateResponse == nil {
+		return
+	}
+
+	assert.Equal(t, "ARS", exchangeRateResponse.BaseCurrency)
+
+	supportedCurrencyCodes := []string{"AUD", "AWG", "BOB", "BRL", "CAD", "CHF", "CLP", "CNY", "COP", "CZK",
+		"DKK", "EUR", "GBP", "HKD", "ILS", "INR", "JPY", "NIO", "NOK", "NZD", "PEN", "PYG", "RSD", "RUB",
+		"SEK", "SGD", "TRY", "USD", "UYU", "VND", "ZAR"}
+
+	checkExchangeRatesHaveSpecifiedCurrencies(t, exchangeRateResponse.BaseCurrency, supportedCurrencyCodes, exchangeRateResponse.ExchangeRates)
+}
+
 func TestExchangeRatesApiLatestExchangeRateHandler_BankOfCanadaDataSource(t *testing.T) {
 	exchangeRateResponse := executeLatestExchangeRateHandler(t, settings.BankOfCanadaDataSource)
 
@@ -145,8 +161,9 @@ func TestExchangeRatesApiLatestExchangeRateHandler_NationalBankOfKazakhstan(t *t
 	assert.Equal(t, "KZT", exchangeRateResponse.BaseCurrency)
 
 	supportedCurrencyCodes := []string{"AED", "AMD", "AUD", "AZN", "BRL", "BYN", "CAD", "CHF", "CNY", "CZK",
-		"DKK", "EUR", "GBP", "GEL", "HKD", "HUF", "INR", "IRR", "JPY", "KGS", "KRW", "KWD", "MDL", "MXN",
-		"MYR", "NOK", "PLN", "RUB", "SAR", "SEK", "SGD", "THB", "TJS", "TRY", "UAH", "USD", "UZS", "ZAR"}
+		"DKK", "EGP", "EUR", "GBP", "GEL", "HKD", "HUF", "IDR", "ILS", "INR", "IRR", "JPY",
+		"KGS", "KRW", "KWD", "MDL", "MNT", "MXN", "MYR", "NOK", "OMR", "PKR", "PLN", "QAR", "RON", "RUB",
+		"SAR", "SEK", "SGD", "THB", "TJS", "TRY", "UAH", "USD", "UZS", "VND", "ZAR"}
 
 	checkExchangeRatesHaveSpecifiedCurrencies(t, exchangeRateResponse.BaseCurrency, supportedCurrencyCodes, exchangeRateResponse.ExchangeRates)
 }

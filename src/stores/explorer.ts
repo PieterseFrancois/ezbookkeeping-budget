@@ -9,7 +9,8 @@ import { useTransactionTagsStore } from './transactionTag.ts';
 import { useExchangeRatesStore } from './exchangeRates.ts';
 
 import { type BeforeResolveFunction, itemAndIndex, keys, values } from '@/core/base.ts';
-import { NumeralSystem, AmountFilterType } from '@/core/numeral.ts';
+import { NormalizedText } from '@/core/text.ts';
+import { NumeralSystem } from '@/core/numeral.ts';
 import { type DateTime, DateRangeScene, DateRange } from '@/core/datetime.ts';
 import { TimezoneTypeForStatistics } from '@/core/timezone.ts';
 import { AccountCategory } from '@/core/account.ts';
@@ -56,7 +57,9 @@ import {
     varianceAndStandardDeviation,
     coefficientOfVariation,
     skewness,
-    kurtosis
+    kurtosis,
+    giniCoefficient,
+    herfindahlHirschmanIndex
 } from '@/lib/math.ts';
 import {
     getUtcOffsetByUtcOffsetMinutes,
@@ -154,6 +157,7 @@ export interface InsightsExplorerTransactionStatisticData {
     p90Amount: number;
     range: number;
     interquartileRange: number;
+    medianToMeanRatio?: number;
     top5AmountShare?: number;
     transactionsFor80PercentAmount?: number;
     variance?: number;
@@ -180,16 +184,30 @@ export const useExplorersStore = defineStore('explorers', () => {
         return result;
     })();
 
-    function buildInsightsExplorerMatchContext(insightsExplorer: InsightsExplorer, transaction: TransactionInsightDataItem): InsightsExplorerMatchContext {
+    function buildInsightsExplorerMatchContext(exploration: InsightsExplorer, transaction: TransactionInsightDataItem): InsightsExplorerMatchContext {
+        let cachedTransactionDateTime: DateTime | undefined = undefined;
+        let cachedNormalizedDescription: NormalizedText | undefined = undefined;
+
         return {
             getTransactionDateTime(): DateTime {
-                let transactionTimeUtfOffset: number | undefined = undefined;
+                if (!cachedTransactionDateTime) {
+                    let transactionTimeUtfOffset: number | undefined = undefined;
 
-                if (insightsExplorer.timezoneUsedForDateRange === TimezoneTypeForStatistics.TransactionTimezone.type) {
-                    transactionTimeUtfOffset = transaction.utcOffset;
+                    if (exploration.timezoneUsedForDateRange === TimezoneTypeForStatistics.TransactionTimezone.type) {
+                        transactionTimeUtfOffset = transaction.utcOffset;
+                    }
+
+                    cachedTransactionDateTime = isDefined(transactionTimeUtfOffset) ? parseDateTimeFromUnixTimeWithTimezoneOffset(transaction.time, transactionTimeUtfOffset) : parseDateTimeFromUnixTime(transaction.time);
                 }
 
-                return isDefined(transactionTimeUtfOffset) ? parseDateTimeFromUnixTimeWithTimezoneOffset(transaction.time, transactionTimeUtfOffset) : parseDateTimeFromUnixTime(transaction.time);
+                return cachedTransactionDateTime;
+            },
+            getNormalizedDescription(): NormalizedText {
+                if (!cachedNormalizedDescription) {
+                    cachedNormalizedDescription = NormalizedText.of(transaction.comment ? transaction.comment : '');
+                }
+
+                return cachedNormalizedDescription;
             }
         };
     }
@@ -376,7 +394,7 @@ export const useExplorersStore = defineStore('explorers', () => {
         }
 
         if (dimension === TransactionExplorerDataDimension.None) {
-            const valueMetric = TransactionExplorerValueMetric.valueOf(currentInsightsExplorer.value.valueMetric);
+            const valueMetric = TransactionExplorerValueMetric.valueOf(currentExploration.value.valueMetric);
             return {
                 categoryName: valueMetric?.name ?? 'Unknown',
                 categoryNameNeedI18n: true,
@@ -599,14 +617,14 @@ export const useExplorersStore = defineStore('explorers', () => {
                 categoryName: transaction.primaryCategory.name,
                 categoryId: transaction.primaryCategory.id,
                 categoryIdType: TransactionExplorerDimensionType.Category,
-                categoryDisplayOrders: [transaction.primaryCategory.displayOrder]
+                categoryDisplayOrders: [transaction.primaryCategory.type, transaction.primaryCategory.displayOrder]
             };
         } else if (dimension === TransactionExplorerDataDimension.SecondaryCategory) {
             return {
                 categoryName: transaction.secondaryCategory.name,
                 categoryId: transaction.categoryId,
                 categoryIdType: TransactionExplorerDimensionType.Category,
-                categoryDisplayOrders: [transaction.primaryCategory.displayOrder, transaction.secondaryCategory.displayOrder]
+                categoryDisplayOrders: [transaction.primaryCategory.type, transaction.primaryCategory.displayOrder, transaction.secondaryCategory.displayOrder]
             };
         } else if (dimension === TransactionExplorerDataDimension.SourceAmount || dimension === TransactionExplorerDataDimension.DestinationAmount) {
             if (dimension === TransactionExplorerDataDimension.DestinationAmount && transaction.type !== TransactionType.Transfer) {
@@ -846,51 +864,51 @@ export const useExplorersStore = defineStore('explorers', () => {
         return allAmountRanges;
     }
 
-    function loadInsightsExplorerList(explorers: InsightsExplorerBasicInfo[]): void {
-        allInsightsExplorerBasicInfos.value = explorers;
-        allInsightsExplorerBasicInfosMap.value = {};
+    function loadInsightsExplorerList(explorations: InsightsExplorerBasicInfo[]): void {
+        allExplorationBasicInfos.value = explorations;
+        allExplorationBasicInfosMap.value = {};
 
-        for (const explorer of explorers) {
-            allInsightsExplorerBasicInfosMap.value[explorer.id] = explorer;
+        for (const exploration of explorations) {
+            allExplorationBasicInfosMap.value[exploration.id] = exploration;
         }
     }
 
-    function addExplorerToInsightsExplorerList(explorer: InsightsExplorerBasicInfo): void {
-        allInsightsExplorerBasicInfos.value.push(explorer);
-        allInsightsExplorerBasicInfosMap.value[explorer.id] = explorer;
+    function addExplorationToInsightsExplorerList(exploration: InsightsExplorerBasicInfo): void {
+        allExplorationBasicInfos.value.push(exploration);
+        allExplorationBasicInfosMap.value[exploration.id] = exploration;
     }
 
-    function updateExplorerInInsightsExplorerList(currentExplorer: InsightsExplorerBasicInfo): void {
-        for (const [explorer, index] of itemAndIndex(allInsightsExplorerBasicInfos.value)) {
-            if (explorer.id === currentExplorer.id) {
-                allInsightsExplorerBasicInfos.value.splice(index, 1, currentExplorer);
+    function updateExplorationInInsightsExplorerList(currentExploration: InsightsExplorerBasicInfo): void {
+        for (const [explorer, index] of itemAndIndex(allExplorationBasicInfos.value)) {
+            if (explorer.id === currentExploration.id) {
+                allExplorationBasicInfos.value.splice(index, 1, currentExploration);
                 break;
             }
         }
 
-        allInsightsExplorerBasicInfosMap.value[currentExplorer.id] = currentExplorer;
+        allExplorationBasicInfosMap.value[currentExploration.id] = currentExploration;
     }
 
     function updateExplorerDisplayOrderInInsightsExplorerList({ from, to }: { from: number, to: number }): void {
-        allInsightsExplorerBasicInfos.value.splice(to, 0, allInsightsExplorerBasicInfos.value.splice(from, 1)[0] as InsightsExplorer);
+        allExplorationBasicInfos.value.splice(to, 0, allExplorationBasicInfos.value.splice(from, 1)[0] as InsightsExplorer);
     }
 
-    function updateExplorerVisibilityInInsightsExplorerList({ explorerId, hidden }: { explorerId: string, hidden: boolean }): void {
-        if (allInsightsExplorerBasicInfosMap.value[explorerId]) {
-            allInsightsExplorerBasicInfosMap.value[explorerId]!.hidden = hidden;
+    function updateExplorationVisibilityInInsightsExplorerList({ explorationId, hidden }: { explorationId: string, hidden: boolean }): void {
+        if (allExplorationBasicInfosMap.value[explorationId]) {
+            allExplorationBasicInfosMap.value[explorationId]!.hidden = hidden;
         }
     }
 
-    function removeExplorerFromInsightsExplorerList(currentExplorer: InsightsExplorerBasicInfo): void {
-        for (const [insightsExplorer, index] of itemAndIndex(allInsightsExplorerBasicInfos.value)) {
-            if (insightsExplorer.id === currentExplorer.id) {
-                allInsightsExplorerBasicInfos.value.splice(index, 1);
+    function removeExplorationFromInsightsExplorerList(currentExploration: InsightsExplorerBasicInfo): void {
+        for (const [insightsExplorer, index] of itemAndIndex(allExplorationBasicInfos.value)) {
+            if (insightsExplorer.id === currentExploration.id) {
+                allExplorationBasicInfos.value.splice(index, 1);
                 break;
             }
         }
 
-        if (allInsightsExplorerBasicInfosMap.value[currentExplorer.id]) {
-            delete allInsightsExplorerBasicInfosMap.value[currentExplorer.id];
+        if (allExplorationBasicInfosMap.value[currentExploration.id]) {
+            delete allExplorationBasicInfosMap.value[currentExploration.id];
         }
     }
 
@@ -903,9 +921,9 @@ export const useExplorersStore = defineStore('explorers', () => {
     const transactionExplorerAllData = ref<TransactionInfoResponse[]>([]);
     const transactionExplorerStateInvalid = ref<boolean>(true);
 
-    const allInsightsExplorerBasicInfos = ref<InsightsExplorerBasicInfo[]>([]);
-    const allInsightsExplorerBasicInfosMap = ref<Record<string, InsightsExplorerBasicInfo>>({});
-    const currentInsightsExplorer = ref<InsightsExplorer>(InsightsExplorer.createNewExplorer(generateRandomUUID()));
+    const allExplorationBasicInfos = ref<InsightsExplorerBasicInfo[]>([]);
+    const allExplorationBasicInfosMap = ref<Record<string, InsightsExplorerBasicInfo>>({});
+    const currentExploration = ref<InsightsExplorer>(InsightsExplorer.createNewExplorer(generateRandomUUID()));
     const insightsExplorerListStateInvalid = ref<boolean>(true);
 
     const allTransactions = computed<TransactionInsightDataItem[]>(() => {
@@ -983,9 +1001,9 @@ export const useExplorersStore = defineStore('explorers', () => {
     });
 
     const isUsingAmountRange = computed<boolean>(() => {
-        const chartType = TransactionExplorerChartType.valueOf(currentInsightsExplorer.value.chartType);
-        const categoryDimension = TransactionExplorerDataDimension.valueOf(currentInsightsExplorer.value.categoryDimension);
-        const seriesDimension = chartType?.seriesDimensionRequired ? TransactionExplorerDataDimension.valueOf(currentInsightsExplorer.value.seriesDimension) : TransactionExplorerDataDimension.SeriesDimensionDefault;
+        const chartType = TransactionExplorerChartType.valueOf(currentExploration.value.chartType);
+        const categoryDimension = TransactionExplorerDataDimension.valueOf(currentExploration.value.categoryDimension);
+        const seriesDimension = chartType?.seriesDimensionRequired ? TransactionExplorerDataDimension.valueOf(currentExploration.value.seriesDimension) : TransactionExplorerDataDimension.SeriesDimensionDefault;
         return categoryDimension?.isSourceAmountRange || seriesDimension?.isSourceAmountRange
             || categoryDimension?.isDestinationAmountRange || seriesDimension?.isDestinationAmountRange
             || false;
@@ -996,17 +1014,17 @@ export const useExplorersStore = defineStore('explorers', () => {
             return [];
         }
 
-        if (!currentInsightsExplorer.value.queries || currentInsightsExplorer.value.queries.length < 1) {
+        if (!currentExploration.value.queries || currentExploration.value.queries.length < 1) {
             return allTransactions.value;
         }
 
         const result: TransactionInsightDataItem[] = [];
 
         for (const transaction of allTransactions.value) {
-            const matchOptions: InsightsExplorerMatchContext = buildInsightsExplorerMatchContext(currentInsightsExplorer.value, transaction);
+            const matchOptions: InsightsExplorerMatchContext = buildInsightsExplorerMatchContext(currentExploration.value, transaction);
 
-            for (const query of currentInsightsExplorer.value.queries) {
-                if (currentInsightsExplorer.value.datatableQuerySource && currentInsightsExplorer.value.datatableQuerySource !== query.id) {
+            for (const query of currentExploration.value.queries) {
+                if (currentExploration.value.datatableQuerySource && currentExploration.value.datatableQuerySource !== query.id) {
                     continue;
                 }
 
@@ -1035,6 +1053,7 @@ export const useExplorersStore = defineStore('explorers', () => {
             p90Amount: 0,
             range: 0,
             interquartileRange: 0,
+            medianToMeanRatio: undefined,
             top5AmountShare: undefined,
             transactionsFor80PercentAmount: undefined,
             variance: undefined,
@@ -1101,6 +1120,7 @@ export const useExplorersStore = defineStore('explorers', () => {
             const q1 = percentile(sourceAmounts, 0.25, item => item);
             const q3 = percentile(sourceAmounts, 0.75, item => item);
             statisticData.interquartileRange = Math.trunc(q3 - q1);
+            statisticData.medianToMeanRatio = statisticData.averageAmount !== 0 ? statisticData.medianAmount / statisticData.averageAmount : undefined;
         }
 
         if (sourceAmounts.length > 5) {
@@ -1128,9 +1148,9 @@ export const useExplorersStore = defineStore('explorers', () => {
             return {};
         }
 
-        const chartType = TransactionExplorerChartType.valueOf(currentInsightsExplorer.value.chartType);
-        const categoryDimension = TransactionExplorerDataDimension.valueOf(currentInsightsExplorer.value.categoryDimension);
-        const seriesDimension = chartType?.seriesDimensionRequired ? TransactionExplorerDataDimension.valueOf(currentInsightsExplorer.value.seriesDimension) : TransactionExplorerDataDimension.SeriesDimensionDefault;
+        const chartType = TransactionExplorerChartType.valueOf(currentExploration.value.chartType);
+        const categoryDimension = TransactionExplorerDataDimension.valueOf(currentExploration.value.categoryDimension);
+        const seriesDimension = chartType?.seriesDimensionRequired ? TransactionExplorerDataDimension.valueOf(currentExploration.value.seriesDimension) : TransactionExplorerDataDimension.SeriesDimensionDefault;
 
         if (!chartType || !categoryDimension || !seriesDimension) {
             return {};
@@ -1142,14 +1162,14 @@ export const useExplorersStore = defineStore('explorers', () => {
         const filteredTransactionDestinationAmountsInDefaultCurrency: number[] = [];
 
         for (const transaction of allTransactions.value) {
-            if (!currentInsightsExplorer.value.queries || currentInsightsExplorer.value.queries.length < 1) {
+            if (!currentExploration.value.queries || currentExploration.value.queries.length < 1) {
                 addTransactionToFilteredList(filteredTransactions, filteredTransactionSourceAmountsInDefaultCurrency, filteredTransactionDestinationAmountsInDefaultCurrency, defaultCurrency, '', 0, transaction);
                 continue;
             }
 
-            const matchContext: InsightsExplorerMatchContext = buildInsightsExplorerMatchContext(currentInsightsExplorer.value, transaction);
+            const matchContext: InsightsExplorerMatchContext = buildInsightsExplorerMatchContext(currentExploration.value, transaction);
 
-            for (const [query, index] of itemAndIndex(currentInsightsExplorer.value.queries)) {
+            for (const [query, index] of itemAndIndex(currentExploration.value.queries)) {
                 if (query.match(transaction, matchContext)) {
                     addTransactionToFilteredList(filteredTransactions, filteredTransactionSourceAmountsInDefaultCurrency, filteredTransactionDestinationAmountsInDefaultCurrency, defaultCurrency, query.name, index, transaction);
 
@@ -1161,10 +1181,10 @@ export const useExplorersStore = defineStore('explorers', () => {
         }
 
         const categoriedDataMap: Record<string, CategoriedTransactions> = {};
-        const allAmountRanges: AmountRanges = buildAllAmountRanges(categoryDimension, seriesDimension, filteredTransactionSourceAmountsInDefaultCurrency, filteredTransactionDestinationAmountsInDefaultCurrency, currentInsightsExplorer.value.amountRangeCount);
+        const allAmountRanges: AmountRanges = buildAllAmountRanges(categoryDimension, seriesDimension, filteredTransactionSourceAmountsInDefaultCurrency, filteredTransactionDestinationAmountsInDefaultCurrency, currentExploration.value.amountRangeCount);
 
         for (const item of filteredTransactions) {
-            addTransactionToCategoriedDataMap(currentInsightsExplorer.value.timezoneUsedForDateRange, categoriedDataMap, categoryDimension, seriesDimension, allAmountRanges, item.queryName, item.queryIndex, item.transaction);
+            addTransactionToCategoriedDataMap(currentExploration.value.timezoneUsedForDateRange, categoriedDataMap, categoryDimension, seriesDimension, allAmountRanges, item.queryName, item.queryIndex, item.transaction);
         }
 
         return categoriedDataMap;
@@ -1175,10 +1195,10 @@ export const useExplorersStore = defineStore('explorers', () => {
             return [];
         }
 
-        const chartType = TransactionExplorerChartType.valueOf(currentInsightsExplorer.value.chartType);
-        const categoryDimension = TransactionExplorerDataDimension.valueOf(currentInsightsExplorer.value.categoryDimension);
-        const seriesDimension = chartType?.seriesDimensionRequired ? TransactionExplorerDataDimension.valueOf(currentInsightsExplorer.value.seriesDimension) : TransactionExplorerDataDimension.SeriesDimensionDefault;
-        const valueMetric = TransactionExplorerValueMetric.valueOf(currentInsightsExplorer.value.valueMetric);
+        const chartType = TransactionExplorerChartType.valueOf(currentExploration.value.chartType);
+        const categoryDimension = TransactionExplorerDataDimension.valueOf(currentExploration.value.categoryDimension);
+        const seriesDimension = chartType?.seriesDimensionRequired ? TransactionExplorerDataDimension.valueOf(currentExploration.value.seriesDimension) : TransactionExplorerDataDimension.SeriesDimensionDefault;
+        const valueMetric = TransactionExplorerValueMetric.valueOf(currentExploration.value.valueMetric);
 
         if (!chartType || !categoryDimension || !seriesDimension || !valueMetric) {
             return [];
@@ -1240,7 +1260,7 @@ export const useExplorersStore = defineStore('explorers', () => {
                     if (needCalculateDailyTransactionCount) {
                         let transactionTimeUtfOffset: number | undefined = undefined;
 
-                        if (currentInsightsExplorer.value.timezoneUsedForDateRange === TimezoneTypeForStatistics.TransactionTimezone.type) {
+                        if (currentExploration.value.timezoneUsedForDateRange === TimezoneTypeForStatistics.TransactionTimezone.type) {
                             transactionTimeUtfOffset = transaction.utcOffset;
                         }
 
@@ -1338,8 +1358,8 @@ export const useExplorersStore = defineStore('explorers', () => {
                 } else if (valueMetric === TransactionExplorerValueMetric.SourceAmountInterquartileRange) {
                     if (allSourceAmountsInDefaultCurrency.length > 0) {
                         allSourceAmountsInDefaultCurrency.sort((a, b) => a - b);
-                        const q1 = Math.trunc(percentile(allSourceAmountsInDefaultCurrency, 0.25, item => item));
-                        const q3 = Math.trunc(percentile(allSourceAmountsInDefaultCurrency, 0.75, item => item));
+                        const q1 = percentile(allSourceAmountsInDefaultCurrency, 0.25, item => item);
+                        const q3 = percentile(allSourceAmountsInDefaultCurrency, 0.75, item => item);
                         value = Math.trunc(q3 - q1);
                     } else {
                         value = 0;
@@ -1356,6 +1376,15 @@ export const useExplorersStore = defineStore('explorers', () => {
                         allSourceAmountsInDefaultCurrency.sort((a, b) => a - b);
                         const medianSourceAmountInDefaultCurrency = median(allSourceAmountsInDefaultCurrency, item => item);
                         value = Math.trunc(medianAbsoluteDeviation(allSourceAmountsInDefaultCurrency, medianSourceAmountInDefaultCurrency, item => item));
+                    } else {
+                        value = 0;
+                    }
+                } else if (valueMetric === TransactionExplorerValueMetric.SourceAmountMedianToMeanRatio) {
+                    if (allSourceAmountsInDefaultCurrency.length > 0 && totalSourceAmountSumInDefaultCurrency !== 0) {
+                        allSourceAmountsInDefaultCurrency.sort((a, b) => a - b);
+                        const medianSourceAmountInDefaultCurrency = median(allSourceAmountsInDefaultCurrency, item => item);
+                        const averageSourceAmountInDefaultCurrency = totalSourceAmountSumInDefaultCurrency / allSourceAmountsInDefaultCurrency.length;
+                        value = averageSourceAmountInDefaultCurrency !== 0 ? medianSourceAmountInDefaultCurrency / averageSourceAmountInDefaultCurrency : 0;
                     } else {
                         value = 0;
                     }
@@ -1387,6 +1416,31 @@ export const useExplorersStore = defineStore('explorers', () => {
                     } else {
                         value = 0;
                     }
+                } else if (valueMetric === TransactionExplorerValueMetric.SourceAmountOutlierCount
+                    || valueMetric === TransactionExplorerValueMetric.SourceAmountOutlierRatio) {
+                    if (allSourceAmountsInDefaultCurrency.length > 0) {
+                        allSourceAmountsInDefaultCurrency.sort((a, b) => a - b);
+                        const q1 = percentile(allSourceAmountsInDefaultCurrency, 0.25, item => item);
+                        const q3 = percentile(allSourceAmountsInDefaultCurrency, 0.75, item => item);
+                        const iqr = q3 - q1;
+                        const lowerBound = q1 - 1.5 * iqr;
+                        const upperBound = q3 + 1.5 * iqr;
+
+                        let outlierCount = 0;
+                        for (const amount of allSourceAmountsInDefaultCurrency) {
+                            if (amount < lowerBound || amount > upperBound) {
+                                outlierCount++;
+                            }
+                        }
+
+                        if (valueMetric === TransactionExplorerValueMetric.SourceAmountOutlierCount) {
+                            value = outlierCount;
+                        } else {
+                            value = allSourceAmountsInDefaultCurrency.length > 0 ? 100.0 * outlierCount / allSourceAmountsInDefaultCurrency.length : 0;
+                        }
+                    } else {
+                        value = 0;
+                    }
                 } else if (valueMetric === TransactionExplorerValueMetric.SourceAmountVariance
                     || valueMetric === TransactionExplorerValueMetric.SourceAmountStandardDeviation
                     || valueMetric === TransactionExplorerValueMetric.SourceAmountCoefficientOfVariation
@@ -1407,6 +1461,19 @@ export const useExplorersStore = defineStore('explorers', () => {
                         } else if (valueMetric === TransactionExplorerValueMetric.SourceAmountKurtosis) {
                             value = kurtosis(allSourceAmountsInDefaultCurrency, averageSourceAmountInDefaultCurrency, variance, item => item / AMOUNT_FACTOR);
                         }
+                    } else {
+                        value = 0;
+                    }
+                } else if (valueMetric === TransactionExplorerValueMetric.SourceAmountGiniCoefficient) {
+                    if (allSourceAmountsInDefaultCurrency.length > 0 && totalSourceAmountSumInDefaultCurrency !== 0) {
+                        allSourceAmountsInDefaultCurrency.sort((a, b) => a - b);
+                        value = giniCoefficient(allSourceAmountsInDefaultCurrency, totalSourceAmountSumInDefaultCurrency, item => item);
+                    } else {
+                        value = 0;
+                    }
+                } else if (valueMetric === TransactionExplorerValueMetric.SourceAmountHerfindahlHirschmanIndex) {
+                    if (allSourceAmountsInDefaultCurrency.length > 0 && totalSourceAmountSumInDefaultCurrency !== 0) {
+                        value = herfindahlHirschmanIndex(allSourceAmountsInDefaultCurrency, totalSourceAmountSumInDefaultCurrency, item => item);
                     } else {
                         value = 0;
                     }
@@ -1445,8 +1512,8 @@ export const useExplorersStore = defineStore('explorers', () => {
         insightsExplorerListStateInvalid.value = invalidState;
     }
 
-    function updateCurrentInsightsExplorer(explorer: InsightsExplorer): void {
-        currentInsightsExplorer.value = explorer;
+    function updateCurrentExploration(exploration: InsightsExplorer): void {
+        currentExploration.value = exploration;
     }
 
     function resetTransactionExplorers(): void {
@@ -1454,9 +1521,9 @@ export const useExplorersStore = defineStore('explorers', () => {
         transactionExplorerFilter.value.startTime = 0;
         transactionExplorerFilter.value.endTime = 0;
         transactionExplorerAllData.value = [];
-        allInsightsExplorerBasicInfos.value = [];
-        allInsightsExplorerBasicInfosMap.value = {};
-        currentInsightsExplorer.value = InsightsExplorer.createNewExplorer(generateRandomUUID());
+        allExplorationBasicInfos.value = [];
+        allExplorationBasicInfosMap.value = {};
+        currentExploration.value = InsightsExplorer.createNewExplorer(generateRandomUUID());
         transactionExplorerStateInvalid.value = true;
         insightsExplorerListStateInvalid.value = true;
     }
@@ -1498,7 +1565,7 @@ export const useExplorersStore = defineStore('explorers', () => {
         }
 
         if (resetQuery) {
-            currentInsightsExplorer.value = InsightsExplorer.createNewExplorer(generateRandomUUID());
+            currentExploration.value = InsightsExplorer.createNewExplorer(generateRandomUUID());
         }
     }
 
@@ -1523,11 +1590,11 @@ export const useExplorersStore = defineStore('explorers', () => {
         return changed;
     }
 
-    function getTransactionExplorerPageParams(currentExplorerId: string, activeTab: string): string {
+    function getTransactionExplorerPageParams(currentExplorationId: string, activeTab: string): string {
         const querys: string[] = [];
 
-        if (currentExplorerId) {
-            querys.push('id=' + currentExplorerId);
+        if (currentExplorationId) {
+            querys.push('id=' + currentExplorationId);
         }
 
         if (activeTab) {
@@ -1537,28 +1604,6 @@ export const useExplorersStore = defineStore('explorers', () => {
         querys.push('dateRangeType=' + transactionExplorerFilter.value.dateRangeType);
         querys.push('startTime=' + transactionExplorerFilter.value.startTime);
         querys.push('endTime=' + transactionExplorerFilter.value.endTime);
-
-        return querys.join('&');
-    }
-
-    function getTransactionListPageParams(dimensionType: TransactionExplorerDimensionType, itemId: string): string {
-        const querys: string[] = [];
-
-        if (dimensionType === TransactionExplorerDimensionType.TransactionType) {
-            querys.push(`type=${itemId}`);
-        } else if (dimensionType === TransactionExplorerDimensionType.Account) {
-            querys.push(`accountIds=${itemId}`);
-        } else if (dimensionType === TransactionExplorerDimensionType.Category) {
-            querys.push(`categoryIds=${itemId}`);
-        } else if (dimensionType === TransactionExplorerDimensionType.Amount) {
-            querys.push(`amountFilter=${encodeURIComponent(AmountFilterType.EqualTo.toTextualFilter(parseInt(itemId)))}`);
-        } else {
-            return '';
-        }
-
-        querys.push('dateType=' + transactionExplorerFilter.value.dateRangeType);
-        querys.push('minTime=' + transactionExplorerFilter.value.startTime);
-        querys.push('maxTime=' + transactionExplorerFilter.value.endTime);
 
         return querys.join('&');
     }
@@ -1603,19 +1648,19 @@ export const useExplorersStore = defineStore('explorers', () => {
         });
     }
 
-    function loadAllInsightsExplorerBasicInfos({ force }: { force?: boolean }): Promise<InsightsExplorerBasicInfo[]> {
+    function loadAllExplorationBasicInfos({ force }: { force?: boolean }): Promise<InsightsExplorerBasicInfo[]> {
         if (!force && !insightsExplorerListStateInvalid.value) {
             return new Promise((resolve) => {
-                resolve(allInsightsExplorerBasicInfos.value);
+                resolve(allExplorationBasicInfos.value);
             });
         }
 
         return new Promise((resolve, reject) => {
-            services.getAllInsightsExplorers().then(response => {
+            services.getAllExplorations().then(response => {
                 const data = response.data;
 
                 if (!data || !data.success || !data.result) {
-                    reject({ message: 'Unable to retrieve explorer list' });
+                    reject({ message: 'Unable to retrieve exploration list' });
                     return;
                 }
 
@@ -1623,27 +1668,27 @@ export const useExplorersStore = defineStore('explorers', () => {
                     updateInsightsExplorerListInvalidState(false);
                 }
 
-                const explorerBasicInfos = InsightsExplorerBasicInfo.ofMulti(data.result);
+                const explorationBasicInfos = InsightsExplorerBasicInfo.ofMulti(data.result);
 
-                if (force && data.result && isEquals(allInsightsExplorerBasicInfos.value, explorerBasicInfos)) {
-                    reject({ message: 'Explorer list is up to date', isUpToDate: true });
+                if (force && data.result && isEquals(allExplorationBasicInfos.value, explorationBasicInfos)) {
+                    reject({ message: 'Exploration list is up to date', isUpToDate: true });
                     return;
                 }
 
-                loadInsightsExplorerList(explorerBasicInfos);
+                loadInsightsExplorerList(explorationBasicInfos);
 
-                resolve(explorerBasicInfos);
+                resolve(explorationBasicInfos);
             }).catch(error => {
                 if (force) {
-                    logger.error('failed to force load explorer list', error);
+                    logger.error('failed to force load exploration list', error);
                 } else {
-                    logger.error('failed to load explorer list', error);
+                    logger.error('failed to load exploration list', error);
                 }
 
                 if (error.response && error.response.data && error.response.data.errorMessage) {
                     reject({ error: error.response.data });
                 } else if (!error.processed) {
-                    reject({ message: 'Unable to retrieve explorer list' });
+                    reject({ message: 'Unable to retrieve exploration list' });
                 } else {
                     reject(error);
                 }
@@ -1651,15 +1696,15 @@ export const useExplorersStore = defineStore('explorers', () => {
         });
     }
 
-    function getInsightsExplorer({ explorerId }: { explorerId: string }): Promise<InsightsExplorer> {
+    function getExploration({ explorationId }: { explorationId: string }): Promise<InsightsExplorer> {
         return new Promise((resolve, reject) => {
-            services.getInsightsExplorer({
-                id: explorerId
+            services.getExploration({
+                id: explorationId
             }).then(response => {
                 const data = response.data;
 
                 if (!data || !data.success || !data.result) {
-                    reject({ message: 'Unable to retrieve explorer' });
+                    reject({ message: 'Unable to retrieve exploration' });
                     return;
                 }
 
@@ -1667,12 +1712,12 @@ export const useExplorersStore = defineStore('explorers', () => {
 
                 resolve(transactionCategory);
             }).catch(error => {
-                logger.error('failed to load explorer info', error);
+                logger.error('failed to load exploration info', error);
 
                 if (error.response && error.response.data && error.response.data.errorMessage) {
                     reject({ error: error.response.data });
                 } else if (!error.processed) {
-                    reject({ message: 'Unable to retrieve explorer' });
+                    reject({ message: 'Unable to retrieve exploration' });
                 } else {
                     reject(error);
                 }
@@ -1680,47 +1725,47 @@ export const useExplorersStore = defineStore('explorers', () => {
         });
     }
 
-    function saveInsightsExplorer({ explorer, saveAs, clientSessionId }: { explorer: InsightsExplorer, saveAs?: boolean, clientSessionId: string }): Promise<InsightsExplorer> {
+    function saveExploration({ exploration, saveAs, clientSessionId }: { exploration: InsightsExplorer, saveAs?: boolean, clientSessionId: string }): Promise<InsightsExplorer> {
         return new Promise((resolve, reject) => {
             let promise: ApiResponsePromise<InsightsExplorerInfoResponse>;
 
-            if (!explorer.id || saveAs) {
-                promise = services.addInsightsExplorer(explorer.toCreateRequest(clientSessionId));
+            if (!exploration.id || saveAs) {
+                promise = services.addExploration(exploration.toCreateRequest(clientSessionId));
             } else {
-                promise = services.modifyInsightsExplorer(explorer.toModifyRequest());
+                promise = services.modifyExploration(exploration.toModifyRequest());
             }
 
             promise.then(response => {
                 const data = response.data;
 
                 if (!data || !data.success || !data.result) {
-                    if (!explorer.id) {
-                        reject({ message: 'Unable to add explorer' });
+                    if (!exploration.id) {
+                        reject({ message: 'Unable to add exploration' });
                     } else {
-                        reject({ message: 'Unable to save explorer' });
+                        reject({ message: 'Unable to save exploration' });
                     }
                     return;
                 }
 
-                const explorerBasicInfo = InsightsExplorerBasicInfo.of(data.result);
+                const explorationBasicInfo = InsightsExplorerBasicInfo.of(data.result);
 
-                if (!explorer.id || saveAs) {
-                    addExplorerToInsightsExplorerList(explorerBasicInfo);
+                if (!exploration.id || saveAs) {
+                    addExplorationToInsightsExplorerList(explorationBasicInfo);
                 } else {
-                    updateExplorerInInsightsExplorerList(explorerBasicInfo);
+                    updateExplorationInInsightsExplorerList(explorationBasicInfo);
                 }
 
                 resolve(InsightsExplorer.of(data.result));
             }).catch(error => {
-                logger.error('failed to save explorer', error);
+                logger.error('failed to save exploration', error);
 
                 if (error.response && error.response.data && error.response.data.errorMessage) {
                     reject({ error: error.response.data });
                 } else if (!error.processed) {
-                    if (!explorer.id) {
-                        reject({ message: 'Unable to add explorer' });
+                    if (!exploration.id) {
+                        reject({ message: 'Unable to add exploration' });
                     } else {
-                        reject({ message: 'Unable to save explorer' });
+                        reject({ message: 'Unable to save exploration' });
                     }
                 } else {
                     reject(error);
@@ -1729,19 +1774,19 @@ export const useExplorersStore = defineStore('explorers', () => {
         });
     }
 
-    function changeInsightsExplorerDisplayOrder({ explorerId, from, to }: { explorerId: string, from: number, to: number }): Promise<void> {
+    function changeExplorationDisplayOrder({ explorationId, from, to }: { explorationId: string, from: number, to: number }): Promise<void> {
         return new Promise((resolve, reject) => {
-            let currentExplorer: InsightsExplorerBasicInfo | null = null;
+            let currentExploration: InsightsExplorerBasicInfo | null = null;
 
-            for (const insightsExplorer of allInsightsExplorerBasicInfos.value) {
-                if (insightsExplorer.id === explorerId) {
-                    currentExplorer = insightsExplorer;
+            for (const exploration of allExplorationBasicInfos.value) {
+                if (exploration.id === explorationId) {
+                    currentExploration = exploration;
                     break;
                 }
             }
 
-            if (!currentExplorer || !allInsightsExplorerBasicInfos.value[to]) {
-                reject({ message: 'Unable to move explorer' });
+            if (!currentExploration || !allExplorationBasicInfos.value[to]) {
+                reject({ message: 'Unable to move exploration' });
                 return;
             }
 
@@ -1755,28 +1800,28 @@ export const useExplorersStore = defineStore('explorers', () => {
         });
     }
 
-    function updateInsightsExplorerDisplayOrders(): Promise<boolean> {
+    function updateExplorationDisplayOrders(): Promise<boolean> {
         const newDisplayOrders: InsightsExplorerNewDisplayOrderRequest[] = [];
 
-        for (const [insightsExplorer, index] of itemAndIndex(allInsightsExplorerBasicInfos.value)) {
+        for (const [exploration, index] of itemAndIndex(allExplorationBasicInfos.value)) {
             newDisplayOrders.push({
-                id: insightsExplorer.id,
+                id: exploration.id,
                 displayOrder: index + 1
             });
         }
 
         return new Promise((resolve, reject) => {
-            services.moveInsightsExplorer({
+            services.moveExploration({
                 newDisplayOrders: newDisplayOrders
             }).then(response => {
                 const data = response.data;
 
                 if (!data || !data.success || !data.result) {
-                    reject({ message: 'Unable to move explorer' });
+                    reject({ message: 'Unable to move exploration' });
                     return;
                 }
 
-                loadAllInsightsExplorerBasicInfos({ force: false }).finally(() => {
+                loadAllExplorationBasicInfos({ force: false }).finally(() => {
                     if (insightsExplorerListStateInvalid.value) {
                         updateInsightsExplorerListInvalidState(false);
                     }
@@ -1784,12 +1829,12 @@ export const useExplorersStore = defineStore('explorers', () => {
                     resolve(data.result);
                 });
             }).catch(error => {
-                logger.error('failed to save explorers display order', error);
+                logger.error('failed to save explorations display order', error);
 
                 if (error.response && error.response.data && error.response.data.errorMessage) {
                     reject({ error: error.response.data });
                 } else if (!error.processed) {
-                    reject({ message: 'Unable to move explorer' });
+                    reject({ message: 'Unable to move exploration' });
                 } else {
                     reject(error);
                 }
@@ -1797,37 +1842,37 @@ export const useExplorersStore = defineStore('explorers', () => {
         });
     }
 
-    function hideInsightsExplorer({ explorer, hidden }: { explorer: InsightsExplorer | InsightsExplorerBasicInfo, hidden: boolean }): Promise<boolean> {
+    function hideExploration({ exploration, hidden }: { exploration: InsightsExplorer | InsightsExplorerBasicInfo, hidden: boolean }): Promise<boolean> {
         return new Promise((resolve, reject) => {
-            services.hideInsightsExplorer({
-                id: explorer.id,
+            services.hideExploration({
+                id: exploration.id,
                 hidden: hidden
             }).then(response => {
                 const data = response.data;
 
                 if (!data || !data.success || !data.result) {
                     if (hidden) {
-                        reject({ message: 'Unable to hide this explorer' });
+                        reject({ message: 'Unable to hide this exploration' });
                     } else {
-                        reject({ message: 'Unable to unhide this explorer' });
+                        reject({ message: 'Unable to unhide this exploration' });
                     }
                     return;
                 }
 
-                explorer.hidden = hidden;
-                updateExplorerVisibilityInInsightsExplorerList({ explorerId: explorer.id, hidden });
+                exploration.hidden = hidden;
+                updateExplorationVisibilityInInsightsExplorerList({ explorationId: exploration.id, hidden });
 
                 resolve(data.result);
             }).catch(error => {
-                logger.error('failed to change explorer visibility', error);
+                logger.error('failed to change exploration visibility', error);
 
                 if (error.response && error.response.data && error.response.data.errorMessage) {
                     reject({ error: error.response.data });
                 } else if (!error.processed) {
                     if (hidden) {
-                        reject({ message: 'Unable to hide this explorer' });
+                        reject({ message: 'Unable to hide this exploration' });
                     } else {
-                        reject({ message: 'Unable to unhide this explorer' });
+                        reject({ message: 'Unable to unhide this exploration' });
                     }
                 } else {
                     reject(error);
@@ -1836,34 +1881,34 @@ export const useExplorersStore = defineStore('explorers', () => {
         });
     }
 
-    function deleteInsightsExplorer({ explorer, beforeResolve }: { explorer: InsightsExplorer, beforeResolve?: BeforeResolveFunction }): Promise<boolean> {
+    function deleteExploration({ exploration, beforeResolve }: { exploration: InsightsExplorer, beforeResolve?: BeforeResolveFunction }): Promise<boolean> {
         return new Promise((resolve, reject) => {
-            services.deleteInsightsExplorer({
-                id: explorer.id
+            services.deleteExploration({
+                id: exploration.id
             }).then(response => {
                 const data = response.data;
 
                 if (!data || !data.success || !data.result) {
-                    reject({ message: 'Unable to delete this explorer' });
+                    reject({ message: 'Unable to delete this exploration' });
                     return;
                 }
 
                 if (beforeResolve) {
                     beforeResolve(() => {
-                        removeExplorerFromInsightsExplorerList(explorer);
+                        removeExplorationFromInsightsExplorerList(exploration);
                     });
                 } else {
-                    removeExplorerFromInsightsExplorerList(explorer);
+                    removeExplorationFromInsightsExplorerList(exploration);
                 }
 
                 resolve(data.result);
             }).catch(error => {
-                logger.error('failed to delete explorer', error);
+                logger.error('failed to delete exploration', error);
 
                 if (error.response && error.response.data && error.response.data.errorMessage) {
                     reject({ error: error.response.data });
                 } else if (!error.processed) {
-                    reject({ message: 'Unable to delete this explorer' });
+                    reject({ message: 'Unable to delete this exploration' });
                 } else {
                     reject(error);
                 }
@@ -1875,31 +1920,31 @@ export const useExplorersStore = defineStore('explorers', () => {
         // states
         transactionExplorerFilter,
         transactionExplorerStateInvalid,
-        allInsightsExplorerBasicInfos,
-        allInsightsExplorerBasicInfosMap,
-        currentInsightsExplorer,
+        allExplorationBasicInfos,
+        allExplorationBasicInfosMap,
+        currentExploration,
         insightsExplorerListStateInvalid,
         // computed
         isUsingAmountRange,
         filteredTransactionsInDataTable,
         filteredTransactionsInDataTableStatistic,
         categoriedTransactionExplorerData,
+        categoriedTransactions,
         // functions
         updateTransactionExplorerInvalidState,
         updateInsightsExplorerListInvalidState,
-        updateCurrentInsightsExplorer,
+        updateCurrentExploration,
         resetTransactionExplorers,
         initTransactionExplorerFilter,
         updateTransactionExplorerFilter,
         getTransactionExplorerPageParams,
-        getTransactionListPageParams,
         loadAllTransactions,
-        loadAllInsightsExplorerBasicInfos,
-        getInsightsExplorer,
-        saveInsightsExplorer,
-        changeInsightsExplorerDisplayOrder,
-        updateInsightsExplorerDisplayOrders,
-        hideInsightsExplorer,
-        deleteInsightsExplorer
+        loadAllExplorationBasicInfos,
+        getExploration,
+        saveExploration,
+        changeExplorationDisplayOrder,
+        updateExplorationDisplayOrders,
+        hideExploration,
+        deleteExploration
     };
 });

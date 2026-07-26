@@ -256,6 +256,7 @@ export class Transaction implements TransactionInfoResponse {
 
         return {
             id: this.id,
+            type: this.type,
             categoryId: categoryId,
             time: this.time,
             utcOffset: this.utcOffset,
@@ -547,6 +548,7 @@ export interface TransactionCreateRequest {
 
 export interface TransactionModifyRequest {
     readonly id: string;
+    readonly type: number;
     readonly categoryId: string;
     readonly time: number;
     readonly utcOffset: number;
@@ -617,6 +619,7 @@ export interface TransactionListByMaxTimeRequest {
     readonly tagFilter: string;
     readonly amountFilter: string;
     readonly keyword: string;
+    readonly matchMode: number;
     readonly mustHavePictures?: boolean;
     readonly withPictures?: boolean;
 }
@@ -630,6 +633,7 @@ export interface TransactionListInMonthByPageRequest {
     readonly tagFilter: string;
     readonly amountFilter: string;
     readonly keyword: string;
+    readonly matchMode: number;
     readonly mustHavePictures?: boolean;
     readonly withPictures?: boolean;
 }
@@ -682,6 +686,7 @@ export interface TransactionStatisticRequest {
     readonly endTime: number;
     readonly tagFilter: string;
     readonly keyword: string;
+    readonly matchMode: number;
     readonly useTransactionTimezone: boolean;
 }
 
@@ -693,6 +698,7 @@ export interface YearMonthRangeRequest {
 export interface TransactionStatisticTrendsRequest extends YearMonthRangeRequest {
     readonly tagFilter: string;
     readonly keyword: string;
+    readonly matchMode: number;
     readonly useTransactionTimezone: boolean;
 }
 

@@ -5,22 +5,22 @@
             <f7-nav-title :title="tt(title)"></f7-nav-title>
             <f7-nav-right :class="{ 'navbar-compact-icons': true, 'disabled': loading }" v-if="mode !== TransactionEditPageMode.View || transaction.type !== TransactionType.ModifyBalance">
                 <f7-link icon-f7="ellipsis" @click="showMoreActionSheet = true"></f7-link>
-                <f7-link icon-f7="checkmark_alt" :class="{ 'disabled': inputIsEmpty || submitting }" @click="save(AfterSaveAction.GoBack)" v-if="mode !== TransactionEditPageMode.View"></f7-link>
+                <f7-link icon-f7="checkmark_alt" :class="{ 'disabled': inputIsEmpty || submitting || recognizing }" @click="save(AfterSaveAction.GoBack)" v-if="mode !== TransactionEditPageMode.View"></f7-link>
             </f7-nav-right>
         </f7-navbar>
 
-        <f7-block :class="{ 'no-margin-top margin-bottom': true, 'disabled': loading }">
-            <f7-segmented strong round :class="{ 'readonly': pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode !== TransactionEditPageMode.Add }">
+        <f7-block :class="{ 'subnav-segmented-bar': true, 'disabled': loading }">
+            <f7-segmented strong round :class="{ 'readonly': pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode !== TransactionEditPageMode.Add && mode !== TransactionEditPageMode.Edit }">
                 <f7-button round :text="tt('Expense')" :active="transaction.type === TransactionType.Expense"
-                           :disabled="pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode !== TransactionEditPageMode.Add && transaction.type !== TransactionType.Expense"
+                           :disabled="pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode !== TransactionEditPageMode.Add && mode !== TransactionEditPageMode.Edit && transaction.type !== TransactionType.Expense"
                            v-if="transaction.type !== TransactionType.ModifyBalance"
                            @click="transaction.type = TransactionType.Expense"></f7-button>
                 <f7-button round :text="tt('Income')" :active="transaction.type === TransactionType.Income"
-                           :disabled="pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode !== TransactionEditPageMode.Add && transaction.type !== TransactionType.Income"
+                           :disabled="pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode !== TransactionEditPageMode.Add && mode !== TransactionEditPageMode.Edit && transaction.type !== TransactionType.Income"
                            v-if="transaction.type !== TransactionType.ModifyBalance"
                            @click="transaction.type = TransactionType.Income"></f7-button>
                 <f7-button round :text="tt('Transfer')" :active="transaction.type === TransactionType.Transfer"
-                           :disabled="pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode !== TransactionEditPageMode.Add && transaction.type !== TransactionType.Transfer"
+                           :disabled="pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode !== TransactionEditPageMode.Add && mode !== TransactionEditPageMode.Edit && transaction.type !== TransactionType.Transfer"
                            v-if="transaction.type !== TransactionType.ModifyBalance"
                            @click="transaction.type = TransactionType.Transfer"></f7-button>
                 <f7-button round :text="tt('Modify Balance')" :active="transaction.type === TransactionType.ModifyBalance"
@@ -28,14 +28,19 @@
             </f7-segmented>
         </f7-block>
 
-        <f7-list strong inset dividers class="margin-vertical skeleton-text" v-if="loading">
+        <f7-list strong inset dividers class="margin-vertical-half skeleton-text" v-if="loading">
             <f7-list-input label="Template Name" placeholder="Template Name" v-if="pageTypeAndMode?.type === TransactionEditPageType.Template"></f7-list-input>
             <f7-list-item
                 class="transaction-edit-amount ebk-large-amount"
                 header="Expense Amount" title="0.00">
             </f7-list-item>
+            <f7-list-item
+                class="transaction-edit-amount ebk-large-amount"
+                header="Transfer In Amount" title="0.00" v-if="transaction.type === TransactionType.Transfer">
+            </f7-list-item>
             <f7-list-item class="list-item-with-header-and-title list-item-title-hide-overflow" header="Category" title="Category Names" v-if="transaction.type !== TransactionType.ModifyBalance"></f7-list-item>
             <f7-list-item class="list-item-with-header-and-title" header="Account" title="Account Name"></f7-list-item>
+            <f7-list-item class="list-item-with-header-and-title" header="Destination Account" title="Account Name" v-if="transaction.type === TransactionType.Transfer"></f7-list-item>
             <f7-list-item class="list-item-with-header-and-title" header="Transaction Time" title="YYYY/MM/DD HH:mm:ss" v-if="pageTypeAndMode?.type === TransactionEditPageType.Transaction"></f7-list-item>
             <f7-list-item class="list-item-with-header-and-title" header="Scheduled Transaction Frequency" title="Every XXXXX" v-if="pageTypeAndMode?.type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type"></f7-list-item>
             <f7-list-item class="list-item-with-header-and-title list-item-title-hide-overflow list-item-no-item-after" header="Transaction Timezone" title="(UTC XX:XX) System Default" link="#" :no-chevron="mode === TransactionEditPageMode.View" v-if="pageTypeAndMode?.type === TransactionEditPageType.Transaction || (pageTypeAndMode?.type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type)"></f7-list-item>
@@ -50,7 +55,7 @@
             <f7-list-input type="textarea" label="Description" placeholder="Your transaction description (optional)"></f7-list-input>
         </f7-list>
 
-        <f7-list form strong inset dividers class="margin-vertical" v-else-if="!loading">
+        <f7-list form strong inset dividers class="margin-vertical-half" v-else-if="!loading">
             <f7-list-input
                 type="text"
                 clear-button
@@ -443,7 +448,7 @@
                 class="transaction-edit-comment"
                 style="height: auto"
                 :class="{ 'readonly': mode === TransactionEditPageMode.View }"
-                :label="tt('Description')"
+                :label="transactionDescriptionTitle"
                 :placeholder="mode !== TransactionEditPageMode.View ? tt('Your transaction description (optional)') : ''"
                 v-textarea-auto-size
                 v-model:value="transaction.comment"
@@ -464,6 +469,9 @@
         </f7-actions>
 
         <f7-actions close-by-outside-click close-on-escape :opened="showMoreActionSheet" @actions:closed="showMoreActionSheet = false">
+            <f7-actions-group v-if="mode !== TransactionEditPageMode.View && pageTypeAndMode?.type === TransactionEditPageType.Transaction && isTransactionFromAITextRecognitionEnabled()">
+                <f7-actions-button @click="recognizeFromClipboard">{{ tt('AI Clipboard Text Recognition') }}</f7-actions-button>
+            </f7-actions-group>
             <f7-actions-group v-if="mode !== TransactionEditPageMode.View && transaction.type === TransactionType.Transfer">
                 <f7-actions-button @click="swapTransactionData(true, false)">{{ tt('Swap Account') }}</f7-actions-button>
                 <f7-actions-button @click="swapTransactionData(false, true)">{{ tt('Swap Amount') }}</f7-actions-button>
@@ -490,14 +498,14 @@
         </f7-actions>
 
         <template #fixed v-if="quickSaveButtonStyleType === TransactionQuickSaveButtonStyle.BottomLeftFloating.type || quickSaveButtonStyleType === TransactionQuickSaveButtonStyle.BottomCenterFloating.type || quickSaveButtonStyleType === TransactionQuickSaveButtonStyle.BottomRightFloating.type">
-            <f7-fab id="quick-save-button" :class="{ 'disabled': inputIsEmpty || submitting }" :position="quickSaveButtonFloatingPosition"
+            <f7-fab id="quick-save-button" :class="{ 'disabled': inputIsEmpty || submitting || recognizing }" :position="quickSaveButtonFloatingPosition"
                     :text="tt(quickSaveButtonTitle)"
                     @click="quickSave" v-if="mode !== TransactionEditPageMode.View">
             </f7-fab>
         </template>
 
-        <f7-toolbar id="quick-save-button" tabbar bottom v-if="quickSaveButtonStyleType === TransactionQuickSaveButtonStyle.BottomFixed.type && mode !== TransactionEditPageMode.View">
-            <f7-link :class="{ 'disabled': inputIsEmpty || submitting }" @click="quickSave">
+        <f7-toolbar id="quick-save-button" class="compact-tabbar" tabbar bottom v-if="quickSaveButtonStyleType === TransactionQuickSaveButtonStyle.BottomFixed.type && mode !== TransactionEditPageMode.View">
+            <f7-link :class="{ 'disabled': inputIsEmpty || submitting || recognizing }" @click="quickSave">
                 <span class="tabbar-primary-link">{{ tt(quickSaveButtonTitle) }}</span>
             </f7-link>
         </f7-toolbar>
@@ -517,10 +525,11 @@
             </f7-list>
         </f7-popover>
 
+        <a-i-text-recognition-sheet :initial-text="pastedText" v-model:show="showAITextRecognitionSheet" @text:confirm="recognizeText" />
         <f7-photo-browser ref="pictureBrowser" type="popup" navbar-of-text="/"
                           :navbar-show-count="true" :exposition="false"
                           :photos="transactionPictures" :thumbs="transactionThumbs" />
-        <input ref="pictureInput" type="file" style="display: none" :accept="`${SUPPORTED_IMAGE_EXTENSIONS};capture=camera`" @change="uploadPicture($event)" />
+        <input ref="pictureInput" type="file" style="display: none" :accept="`${SUPPORTED_IMAGE_EXTENSIONS};capture=camera`" @change="onUploadPicture($event)" />
     </f7-page>
 </template>
 
@@ -529,7 +538,7 @@ import { ref, computed, useTemplateRef } from 'vue';
 import type { PhotoBrowser, Router } from 'framework7/types';
 
 import { useI18n } from '@/locales/helpers.ts';
-import { useI18nUIComponents, isiOS, showLoading, hideLoading } from '@/lib/ui/mobile.ts';
+import { useI18nUIComponents, isiOS, showLoading, hideLoading, closeAllDialog } from '@/lib/ui/mobile.ts';
 import {
     TransactionEditPageMode,
     TransactionEditPageType,
@@ -554,6 +563,7 @@ import {
     TransactionQuickAddButtonActionType
 } from '@/core/transaction.ts';
 import { ScheduledTemplateFrequencyType, TemplateType } from '@/core/template.ts';
+import { KnownFileType } from '@/core/file.ts';
 
 import { TRANSACTION_MAX_AMOUNT, TRANSACTION_MIN_AMOUNT } from '@/consts/transaction.ts';
 import { KnownErrorCode } from '@/consts/api.ts';
@@ -563,6 +573,7 @@ import { TransactionTemplate } from '@/models/transaction_template.ts';
 import type { TransactionPictureInfoBasicResponse } from '@/models/transaction_picture_info.ts';
 import { Transaction } from '@/models/transaction.ts';
 
+import { isDefined } from '@/lib/common.ts';
 import {
     getTimezoneOffset,
     getTimezoneOffsetMinutes,
@@ -572,12 +583,19 @@ import { formatCoordinate } from '@/lib/coordinate.ts';
 import { generateRandomUUID } from '@/lib/misc.ts';
 import { getTransactionPrimaryCategoryName, getTransactionSecondaryCategoryName } from '@/lib/category.ts';
 import { type SetTransactionOptions } from '@/lib/transaction.ts';
-import { getMapProvider, isTransactionPicturesEnabled } from '@/lib/server_settings.ts';
+import {
+    isTransactionFromAITextRecognitionEnabled,
+    isTransactionPicturesEnabled,
+    getMapProvider
+} from '@/lib/server_settings.ts';
+import { compressJpgImageByQuality } from '@/lib/ui/common.ts';
 import logger from '@/lib/logger.ts';
 
 const props = defineProps<{
     f7route: Router.Route;
     f7router: Router.Router;
+    autoUploadPicture?: File;
+    autoRecognizeClipboardText?: string;
 }>();
 
 const query = props.f7route.query;
@@ -593,7 +611,7 @@ const {
     formatGregorianTextualYearMonthDayToLongDate,
     parseAmountFromLocalizedNumerals
 } = useI18n();
-const { showAlert, showConfirm, showToast, routeBackOnError } = useI18nUIComponents();
+const { showAlert, showConfirm, showCancelableLoading, showToast, routeBackOnError } = useI18nUIComponents();
 
 const {
     mode,
@@ -603,6 +621,7 @@ const {
     duplicateFromId,
     clientSessionId,
     loading,
+    recognizing,
     submitting,
     submitted,
     uploadingPicture,
@@ -614,6 +633,7 @@ const {
     defaultCurrency,
     firstDayOfWeek,
     coordinateDisplayType,
+    imageUploadQualityType,
     allTimezones,
     allVisibleAccounts,
     allVisibleCategorizedAccounts,
@@ -636,9 +656,11 @@ const {
     transactionDisplayTimezone,
     transactionTimezoneTimeDifference,
     geoLocationStatusInfo,
+    transactionDescriptionTitle,
     inputEmptyProblemMessage,
     inputIsEmpty,
     setTransactionModel,
+    updateTransactionModelFromRecognizedResponse,
     updateTransactionModelByAfterSaveAction,
     updateTransactionTime,
     updateTransactionTimezone,
@@ -646,6 +668,8 @@ const {
     getDisplayAmount,
     getTransactionPictureUrl
 } = useTransactionEditPageBase(pageTypeAndMode?.type || TransactionEditPageType.Transaction, pageTypeAndMode?.mode, query['type'] ? parseInt(query['type']) : undefined);
+
+const isSupportClipboard = !!navigator.clipboard;
 
 const settingsStore = useSettingsStore();
 const userStore = useUserStore();
@@ -658,10 +682,9 @@ const transactionTemplatesStore = useTransactionTemplatesStore();
 const pictureBrowser = useTemplateRef<PhotoBrowser.PhotoBrowser>('pictureBrowser');
 const pictureInput = useTemplateRef<HTMLInputElement>('pictureInput');
 
-const isSupportClipboard = !!navigator.clipboard;
-
 const loadingError = ref<unknown | null>(null);
 const removingPictureId = ref<string | null>(null);
+const pastedText = ref<string>('');
 const transactionDateTimeSheetMode = ref<string>('time');
 const showTimeInDefaultTimezone = ref<boolean>(false);
 const showQuickSavePopover = ref<boolean>(false);
@@ -682,6 +705,7 @@ const showTransactionTagSheet = ref<boolean>(false);
 const showTransactionPictures = ref<boolean>(pageTypeAndMode?.type === TransactionEditPageType.Transaction
     && (pageTypeAndMode?.mode === TransactionEditPageMode.Add || pageTypeAndMode?.mode === TransactionEditPageMode.Edit)
     && settingsStore.appSettings.alwaysShowTransactionPicturesInMobileTransactionEditPage);
+const showAITextRecognitionSheet = ref<boolean>(false);
 
 const quickSaveButtonStyleType = computed<number>(() => settingsStore.appSettings.quickSaveButtonStyleInMobileTransactionListPage);
 const quickSaveButtonFloatingPosition = computed<string>(() => {
@@ -803,6 +827,14 @@ const transactionDisplayScheduledFrequency = computed<string>(() => {
 
     if (template.scheduledFrequencyType === ScheduledTemplateFrequencyType.Daily.type) {
         return tt('Daily');
+    } else if (template.scheduledFrequencyType === ScheduledTemplateFrequencyType.EveryNDays.type) {
+        if (scheduledFrequencyValues.length) {
+            return tt('format.misc.everyNDays', {
+                n: scheduledFrequencyValues[0]
+            });
+        } else {
+            return tt('Every N Days');
+        }
     } else if (template.scheduledFrequencyType === ScheduledTemplateFrequencyType.Weekly.type) {
         if (scheduledFrequencyValues.length) {
             return tt('format.misc.everyMultiDaysOfWeek', {
@@ -892,7 +924,9 @@ function getPageTypeNameMode(): { type: TransactionEditPageType, mode: Transacti
 }
 
 function getFontClassByAmount(amount: number): string {
-    if (amount >= 100000000 || amount <= -100000000) {
+    if (amount >= 10000000000 || amount <= -10000000000) {
+        return 'ebk-extra-small-amount';
+    } if (amount >= 100000000 || amount <= -100000000) {
         return 'ebk-small-amount';
     } else if (amount >= 1000000 || amount <= -1000000) {
         return 'ebk-normal-amount';
@@ -1041,7 +1075,22 @@ function init(): void {
             (transaction.value as TransactionTemplate).fillFrom(template);
         }
 
+        if (props.autoUploadPicture) {
+            showTransactionPictures.value = true;
+            uploadPicture(props.autoUploadPicture);
+        }
+
         loading.value = false;
+
+        if (isDefined(props.autoRecognizeClipboardText)) {
+            pastedText.value = props.autoRecognizeClipboardText;
+
+            if (pastedText.value && !settingsStore.appSettings.alwaysRequireConfirmationOfClipboardContentBeforeSubmission) {
+                recognizeText(pastedText.value);
+            } else {
+                showAITextRecognitionSheet.value = true;
+            }
+        }
     }).catch(error => {
         logger.error('failed to load essential data for editing transaction', error);
 
@@ -1192,6 +1241,56 @@ function quickSave(): void {
     save(AfterSaveAction.GoBack);
 }
 
+function recognizeText(text: string): void {
+    if (recognizing.value || loading.value || submitting.value) {
+        return;
+    }
+
+    if (!text || !text.trim()) {
+        return;
+    }
+
+    recognizing.value = true;
+    showCancelableLoading('Recognizing', 'AI can make mistakes. Check important info.');
+
+    transactionsStore.recognizeTransactionText({ text }).then(response => {
+        updateTransactionModelFromRecognizedResponse(response);
+        closeAllDialog();
+        recognizing.value = false;
+    }).catch(error => {
+        closeAllDialog();
+        recognizing.value = false;
+
+        if (!error.processed) {
+            showToast(error.message || error);
+        }
+    });
+}
+
+function recognizeFromClipboard(): void {
+    if (recognizing.value || loading.value || submitting.value) {
+        return;
+    }
+
+    pastedText.value = '';
+
+    if (isSupportClipboard && !isiOS()) {
+        navigator.clipboard.readText().then(text => {
+            pastedText.value = text && text.trim() ? text.trim() : '';
+
+            if (pastedText.value && !settingsStore.appSettings.alwaysRequireConfirmationOfClipboardContentBeforeSubmission) {
+                recognizeText(pastedText.value);
+            } else {
+                showAITextRecognitionSheet.value = true;
+            }
+        }).catch(error => {
+            logger.error('failed to read clipboard', error);
+            showAITextRecognitionSheet.value = true;
+        });
+    } else {
+        showAITextRecognitionSheet.value = true;
+    }
+}
 
 function pasteAmount(type: 'sourceAmount' | 'destinationAmount'): void {
     if (mode.value === TransactionEditPageMode.View || !isSupportClipboard) {
@@ -1285,25 +1384,19 @@ function showOpenPictureDialog(): void {
     pictureInput.value?.click();
 }
 
-function uploadPicture(event: Event): void {
-    if (!event || !event.target) {
+function uploadPicture(file: File): void {
+    if (!file) {
         return;
     }
-
-    const el = event.target as HTMLInputElement;
-
-    if (!el.files || !el.files.length) {
-        return;
-    }
-
-    const pictureFile = el.files[0] as File;
-
-    el.value = '';
 
     uploadingPicture.value = true;
     submitting.value = true;
 
-    transactionsStore.uploadTransactionPicture({ pictureFile }).then(response => {
+    compressJpgImageByQuality(file, imageUploadQualityType.value).then(blob => {
+        return transactionsStore.uploadTransactionPicture({
+            pictureFile: KnownFileType.JPG.createFileFromBlob(blob, "image")
+        });
+    }).then(response => {
         transaction.value.addPicture(response);
         uploadingPicture.value = false;
         submitting.value = false;
@@ -1349,6 +1442,23 @@ function viewOrRemovePicture(pictureInfo: TransactionPictureInfoBasicResponse): 
 
 function duplicate(withTime?: boolean, withGeoLocation?: boolean): void {
     props.f7router.navigate(`/transaction/add?id=${transaction.value.id}&type=${transaction.value.type}&withTime=${withTime ?? false}&withGeoLocation=${withGeoLocation ?? false}`);
+}
+
+function onUploadPicture(event: Event): void {
+    if (!event || !event.target) {
+        return;
+    }
+
+    const el = event.target as HTMLInputElement;
+
+    if (!el.files || !el.files.length || !el.files[0]) {
+        return;
+    }
+
+    const pictureFile = el.files[0] as File;
+
+    el.value = '';
+    uploadPicture(pictureFile);
 }
 
 function onPageAfterIn(): void {
