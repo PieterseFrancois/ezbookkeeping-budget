@@ -19,7 +19,7 @@
 
             <template v-else>
                 <!-- Column headers -->
-                <div class="budget-ov-header-row">
+                <div v-if="budgetSummary.length > 0" class="budget-ov-header-row">
                     <span class="budget-ov-icon-placeholder"></span>
                     <span class="budget-ov-name-cell"></span>
                     <span class="budget-ov-amt-cell">{{ tt('Budgeted') }}</span>
@@ -101,7 +101,7 @@ const userStore = useUserStore();
 
 const showAmountInHomePage = computed<boolean>(() => settingsStore.appSettings.showAmountInHomePage);
 const defaultCurrency = computed<string>(() => userStore.currentUserDefaultCurrency);
-const hasAnyData = computed<boolean>(() => props.budgetSummary && props.budgetSummary.length > 0);
+const hasAnyData = computed<boolean>(() => (props.budgetSummary && props.budgetSummary.length > 0) || (props.unbudgeted && props.unbudgeted.length > 0));
 
 const showUnbudgeted = ref<boolean>(false);
 
