@@ -186,6 +186,7 @@ export default defineConfig(() => {
             sourcemap: false,
             assetsInlineLimit: 0,
             emptyOutDir: true,
+            // @ts-ignore — rolldownOptions is a rolldown-specific extension not yet in Vite's published types
             rolldownOptions: {
                 input: {
                     index: resolve(SRC_DIR, 'index.html'),
@@ -195,7 +196,8 @@ export default defineConfig(() => {
                     'vendor-framework7-rtl': resolve(SRC_DIR, 'mobile-rtl.scss')
                 },
                 output: {
-                    assetFileNames: assetInfo => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    assetFileNames: (assetInfo: any) => {
                         const fileExt = assetInfo.names[0]?.split('.')[1];
 
                         if (!fileExt) {
@@ -235,7 +237,8 @@ export default defineConfig(() => {
                             },
                             {
                                 name:  'vendor-desktop',
-                                test: id => {
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            test: (id: any) => {
                                     if (/[\\/]node_modules[\\/](vuetify|vue-router|vue3-perfect-scrollbar|perfect-scrollbar|vuedraggable|sortablejs|@mdi.*)[\\/]/i.test(id)) {
                                         return true;
                                     } else if (/[\\/]node_modules[\\/]vue-echarts[\\/]/i.test(id)) {
@@ -253,7 +256,8 @@ export default defineConfig(() => {
                             },
                             {
                                 name:  'common',
-                                test: id => {
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            test: (id: any) => {
                                     if (/[\\/]src[\\/](core|consts|models|stores)[\\/]/i.test(id)) {
                                         return true;
                                     } else if (/[\\/]src[\\/]lib[\\/](map[\\/]|ui[\\/]common|calendar[\\/]|[a-zA-Z0-9-_]+\.(js|ts))/i.test(id)) {

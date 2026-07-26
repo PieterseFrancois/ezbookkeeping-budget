@@ -163,7 +163,7 @@
             </f7-list-item>
         </f7-list>
 
-        <budget-overview-card :loading="loadingBudget" :budget-summary="budgetSummary" :unbudgeted="unbudgeted" />
+        <budget-overview-card :loading="loadingBudget" :budget-summary="budgetSummary" :unbudgeted="unbudgeted" :cycle-note="budgetCycleNote" />
 
         <f7-toolbar tabbar icons bottom class="main-tabbar">
             <f7-link class="link" href="/transaction/list">
@@ -245,6 +245,7 @@ import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useTransactionTemplatesStore } from '@/stores/transactionTemplate.ts';
 import { useOverviewStore } from '@/stores/overview.ts';
+import { useUserStore } from '@/stores/user.ts';
 
 import { DateRange } from '@/core/datetime.ts';
 import { CategoryType } from '@/core/category.ts';
@@ -257,6 +258,7 @@ import { isFunction } from '@/lib/common.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 import { getShareCacheImageBlob } from '@/lib/cache.ts';
 import { getThisMonthFirstUnixTime, getThisMonthLastUnixTime } from '@/lib/datetime.ts';
+import { addMonths } from '@/views/base/BudgetPageBase.ts';
 import {
     isTransactionFromAITextRecognitionEnabled,
     isTransactionFromAIImageRecognitionEnabled
@@ -285,6 +287,7 @@ const accountsStore = useAccountsStore();
 const transactionCategoriesStore = useTransactionCategoriesStore();
 const transactionTemplatesStore = useTransactionTemplatesStore();
 const overviewStore = useOverviewStore();
+const userStore = useUserStore();
 
 const aiImageRecognitionSheet = useTemplateRef<AIImageRecognitionSheetType>('aiImageRecognitionSheet');
 
@@ -295,6 +298,17 @@ const showAIReceiptImageRecognitionSheet = ref<boolean>(false);
 
 const budgetSummary = ref<BudgetSummaryItem[]>([]);
 const unbudgeted = ref<UnbudgetedItem[]>([]);
+
+const budgetCycleNote = computed<string>(() => {
+    const endDay = userStore.currentUserBudgetEndDay;
+    if (!endDay) return '';
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const { month: prevMonth } = addMonths(year, month, -1);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `Budget cycle: ${endDay + 1} ${monthNames[prevMonth - 1]} – ${endDay} ${monthNames[month - 1]}`;
+});
 
 interface BudgetTargetRawItem {
     id: string;
@@ -315,8 +329,18 @@ async function loadBudgetOverview(): Promise<void> {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
-    const startTime = getThisMonthFirstUnixTime();
-    const endTime = getThisMonthLastUnixTime();
+    const endDay = userStore.currentUserBudgetEndDay;
+    let startTime: number;
+    let endTime: number;
+
+    if (!endDay) {
+        startTime = getThisMonthFirstUnixTime();
+        endTime = getThisMonthLastUnixTime();
+    } else {
+        const { year: prevYear, month: prevMonth } = addMonths(year, month, -1);
+        startTime = Math.floor(new Date(prevYear, prevMonth - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000);
+        endTime = Math.floor(new Date(year, month - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000) - 1;
+    }
 
     const [budgetResp, statsResp, savingsResp] = await Promise.all([
         axios.get<ApiResponse<BudgetTargetRawItem[]>>(`v1/budget/targets.json?year=${year}&month=${month}`),

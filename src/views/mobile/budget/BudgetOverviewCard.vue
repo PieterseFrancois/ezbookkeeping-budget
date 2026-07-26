@@ -1,7 +1,10 @@
 <template>
     <f7-card class="budget-ov-card" :class="{ 'skeleton-text': loading && !hasAnyData }">
-        <f7-card-header>
-            <span>{{ tt('Budget Overview') }}</span>
+        <f7-card-header class="budget-ov-header">
+            <div>
+                <span>{{ tt('Budget Overview') }}</span>
+                <div v-if="props.cycleNote" class="budget-ov-cycle-note">{{ props.cycleNote }}</div>
+            </div>
             <f7-link href="/budget" class="budget-ov-view-all">{{ tt('View All') }}</f7-link>
         </f7-card-header>
 
@@ -89,6 +92,7 @@ const props = defineProps<{
     loading: boolean;
     budgetSummary: BudgetSummaryItem[];
     unbudgeted: UnbudgetedItem[];
+    cycleNote?: string;
 }>();
 
 const { tt, formatAmountToLocalizedNumeralsWithCurrency } = useI18n();
@@ -118,8 +122,15 @@ function displayAmount(amount: number): string {
     align-items: center;
 }
 
+.budget-ov-cycle-note {
+    font-size: 11px;
+    color: var(--f7-list-item-subtitle-text-color, #888);
+    margin-top: 2px;
+}
+
 .budget-ov-view-all {
     font-size: 13px;
+    align-self: flex-start;
 }
 
 .budget-ov-skeleton {

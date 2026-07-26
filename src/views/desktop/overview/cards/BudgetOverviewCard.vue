@@ -2,6 +2,7 @@
     <v-card :class="{ 'disabled': loading }">
         <template #title>
             <span>{{ tt('Budget Overview') }}</span>
+            <div v-if="props.cycleNote" class="text-caption text-medium-emphasis font-weight-regular">{{ props.cycleNote }}</div>
         </template>
 
         <v-card-text v-if="loading && !hasAnyData">
@@ -101,6 +102,7 @@ const props = defineProps<{
     loading: boolean;
     budgetSummary: BudgetSummaryItem[];
     unbudgeted: UnbudgetedItem[];
+    cycleNote?: string;
 }>();
 
 const { tt, formatAmountToLocalizedNumeralsWithCurrency } = useI18n();
