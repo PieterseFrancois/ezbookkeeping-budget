@@ -1497,8 +1497,9 @@ function onPageAfterIn(): void {
     padding-bottom: 2px;
 }
 
-/* Wrapper exists so the section label can stick within it and be pushed off by the next section.
-   Deliberately unpositioned so it does not create a stacking context around the sticky label. */
+/* The .budget-m-section wrapper in the template is deliberately unstyled: it exists only to bound
+   the sticky label so the next section pushes it off, and must stay unpositioned so it does not
+   create a stacking context around the label. */
 .budget-m-section-label {
     /* Sits just below the sticky column header (40px tall) */
     position: sticky;

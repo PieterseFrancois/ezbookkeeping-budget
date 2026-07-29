@@ -1712,7 +1712,8 @@ if (isUserLogined() && isUserUnlocked()) {
 .budget-th {
     position: sticky;
     top: 0;
-    z-index: 3;
+    /* Above the sticky section labels (4), which in turn sit above the sticky name column (2) */
+    z-index: 5;
     background: rgb(var(--v-theme-surface));
     font-size: 0.75rem;
     color: rgba(var(--v-theme-on-surface), 0.6);
@@ -1724,7 +1725,7 @@ if (isUserLogined() && isUserUnlocked()) {
 }
 
 .budget-th-corner {
-    z-index: 4;
+    z-index: 6;
     border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
@@ -1752,14 +1753,14 @@ if (isUserLogined() && isUserUnlocked()) {
 /* ── Header row 2: B / A / R labels ── */
 .budget-th-sub-corner {
     top: 40px;
-    z-index: 4;
+    z-index: 6;
     border-bottom: 2px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .budget-th-sub {
     position: sticky;
     top: 40px;
-    z-index: 3;
+    z-index: 5;
     font-size: 0.72rem;
     font-weight: 500;
     color: rgba(var(--v-theme-on-surface), 0.5);
@@ -1824,7 +1825,8 @@ if (isUserLogined() && isUserUnlocked()) {
    order, so it paints over the previous one at the same offset. */
 .budget-section-label {
     position: sticky;
-    top: 64px;
+    /* Clears both sticky header rows (40px month titles + ~28px B/A/R labels) */
+    top: 68px;
     z-index: 4;
     background: rgb(var(--v-theme-surface));
     border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12);
