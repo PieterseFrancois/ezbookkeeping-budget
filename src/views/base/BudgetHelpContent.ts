@@ -156,6 +156,27 @@ export const BUDGET_HELP_SECTIONS: BudgetHelpSection[] = [
                 text: 'The Cards & Debt panel at the bottom shows, per card: what you charged this cycle, what you paid, and what is still owed. If you charge more than you pay, the owed amount grows — that is the number to watch.'
             },
             {
+                type: 'p',
+                text: 'If you have more than one card or loan and want a separate target for each, give each one its own subcategory under Loan & Debt — for example "Store Card Repayment" and "Car Loan Repayment". Each becomes its own row with its own target and actual. Tag each repayment transfer with the matching subcategory so it lands on the right row.'
+            },
+            {
+                type: 'example',
+                title: 'Example: budgeting each card separately',
+                lines: [
+                    'Loan & Debt',
+                    '    Store Card Repayment',
+                    '    Car Loan Repayment',
+                    '',
+                    'CARDS & DEBT              Budgeted  Actual  Remaining',
+                    '  Store Card Repayment        R800    R800         R0',
+                    '  Car Loan Repayment         R2500   R2500         R0',
+                    '',
+                    'A single "Repayment" subcategory works too — every card',
+                    'then shares one combined target. Use separate ones only',
+                    'if you want to track each debt on its own.'
+                ]
+            },
+            {
                 type: 'example',
                 title: 'Example: a store card month',
                 lines: [
