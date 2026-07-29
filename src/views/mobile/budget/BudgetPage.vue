@@ -107,7 +107,7 @@
 
         <template v-else>
             <!-- Expense section -->
-            <template v-if="showExpenseSection">
+            <div class="budget-m-section" v-if="showExpenseSection">
                 <div class="budget-m-section-label">
                     {{ tt('Expenses') }}<span class="budget-m-section-hint">{{ tt('money out') }}</span>
                 </div>
@@ -157,12 +157,12 @@
                         </template>
                     </template>
                 </template>
-            </template>
+            </div>
 
             <div v-if="showExpenseSection && showIncomeSection" class="budget-m-section-divider" />
 
             <!-- Income section -->
-            <template v-if="showIncomeSection">
+            <div class="budget-m-section" v-if="showIncomeSection">
                 <div class="budget-m-section-label">
                     {{ tt('Income') }}<span class="budget-m-section-hint">{{ tt('money in') }}</span>
                 </div>
@@ -231,12 +231,12 @@
                         </f7-link>
                     </div>
                 </div>
-            </template>
+            </div>
 
             <div v-if="(showExpenseSection || showIncomeSection) && showSavingsSection" class="budget-m-section-divider" />
 
             <!-- Savings section -->
-            <template v-if="showSavingsSection">
+            <div class="budget-m-section" v-if="showSavingsSection">
                 <div class="budget-m-section-label">
                     {{ tt('Savings') }}<span class="budget-m-section-hint">{{ tt('money out — set aside') }}</span>
                 </div>
@@ -286,12 +286,12 @@
                         </template>
                     </template>
                 </template>
-            </template>
+            </div>
 
             <div v-if="(showExpenseSection || showIncomeSection || showSavingsSection) && showDebtSection" class="budget-m-section-divider" />
 
             <!-- Cards & Debt section -->
-            <template v-if="showDebtSection">
+            <div class="budget-m-section" v-if="showDebtSection">
                 <div class="budget-m-section-label">
                     {{ tt('Cards & Debt') }}<span class="budget-m-section-hint">{{ tt('money out — paydown') }}</span>
                 </div>
@@ -341,7 +341,7 @@
                         </template>
                     </template>
                 </template>
-            </template>
+            </div>
 
             <!-- Empty state -->
             <div v-if="!hasAnyData" class="budget-m-empty">
@@ -1487,22 +1487,53 @@ function onPageAfterIn(): void {
     color: var(--f7-list-chevron-icon-color);
 }
 
+/* Shares the section label's tint so the two form one continuous sticky bar */
 .budget-m-cat-header {
     position: sticky;
     top: 0;
     z-index: 10;
-    background-color: var(--f7-page-bg-color);
+    background-color: color-mix(in srgb, var(--f7-page-bg-color) 94%, var(--f7-theme-color) 6%);
     padding-top: 14px;
     padding-bottom: 2px;
 }
 
+/* Wrapper exists so the section label can stick within it and be pushed off by the next section.
+   Deliberately unpositioned so it does not create a stacking context around the sticky label. */
 .budget-m-section-label {
-    padding: 8px 16px 4px;
+    /* Sits just below the sticky column header (40px tall) */
+    position: sticky;
+    top: 40px;
+    z-index: 9;
+    /* Must be a full opaque band, otherwise rows scrolling underneath show through
+       above and below the short label text */
+    /* Slightly raised off the page background so the sticky band reads as a bar rather than
+       a plain slab, with a soft shadow onto the rows scrolling beneath it */
+    background-color: color-mix(in srgb, var(--f7-page-bg-color) 94%, var(--f7-theme-color) 6%);
+    border-top: 1px solid var(--f7-list-border-color);
+    border-bottom: 1px solid var(--f7-list-border-color);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.14);
+    padding: 12px 16px 10px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
     font-size: 0.68rem;
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    opacity: 0.45;
+    /* Dim the text only — an `opacity` here would make the background translucent
+       and let rows scrolling underneath show through */
+    color: color-mix(in srgb, currentColor 60%, transparent);
+}
+
+/* Small accent tick so each section reads as its own heading */
+.budget-m-section-label::before {
+    content: '';
+    flex-shrink: 0;
+    width: 3px;
+    height: 13px;
+    border-radius: 2px;
+    margin-inline-end: 8px;
+    background-color: var(--f7-theme-color);
 }
 
 .budget-m-section-hint {

@@ -1819,7 +1819,16 @@ if (isUserLogined() && isUserUnlocked()) {
 }
 
 /* ── Section labels ── */
+/* Sticky below the two header rows. Sections are grid rows, not nested containers, so a label
+   is not pushed out by the next section — instead the next label is opaque and later in DOM
+   order, so it paints over the previous one at the same offset. */
 .budget-section-label {
+    position: sticky;
+    top: 64px;
+    z-index: 4;
+    background: rgb(var(--v-theme-surface));
+    border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
     font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 0.06em;
