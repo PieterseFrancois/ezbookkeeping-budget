@@ -45,7 +45,17 @@
                         <span class="subscriptions-m-next-date">{{ subscription.nextExpectedDateDisplay }}</span>
                         <span>{{ subscription.frequencyLabel }}</span>
                     </div>
-                    <div class="subscriptions-m-category" v-if="subscription.categoryName">{{ subscription.categoryName }}</div>
+                    <div class="subscriptions-m-row subscriptions-m-category" v-if="subscription.categoryName || subscription.accountCoverage">
+                        <span>{{ subscription.categoryName }}</span>
+                        <span class="subscriptions-m-account-coverage" v-if="subscription.accountCoverage">
+                            <f7-icon
+                                :f7="subscription.accountCoverage.covered ? 'checkmark_circle_fill' : 'xmark_circle_fill'"
+                                :class="subscription.accountCoverage.covered ? 'text-color-green' : 'text-color-red'"
+                                size="14"
+                            ></f7-icon>
+                            {{ subscription.accountCoverage.accountName }}
+                        </span>
+                    </div>
                 </template>
                 <f7-swipeout-actions right>
                     <f7-swipeout-button color="orange" close :text="tt('Edit')" @click="openEditPopup(subscription.raw)"></f7-swipeout-button>
@@ -131,40 +141,9 @@
                     </f7-list-item>
                     <f7-list-item
                         link="#"
-                        :header="tt('Category')"
-                        :title="primaryCategoryName"
-                        @click="showCategoryPopup = true"
-                    >
-                        <list-item-selection-popup value-type="item"
-                                                   key-field="id" value-field="id"
-                                                   title-field="name"
-                                                   :title="tt('Category')"
-                                                   :items="primaryCategoryOptions"
-                                                   v-model:show="showCategoryPopup"
-                                                   :model-value="form.primaryCategoryId"
-                                                   @update:model-value="(value) => onPrimaryCategoryChange(value as string)">
-                        </list-item-selection-popup>
-                    </f7-list-item>
-                    <f7-list-item
-                        link="#"
-                        :header="tt('Subcategory')"
-                        :title="subCategoryName"
-                        v-if="form.primaryCategoryId !== '0'"
-                        @click="showSubcategoryPopup = true"
-                    >
-                        <list-item-selection-popup value-type="item"
-                                                   key-field="id" value-field="id"
-                                                   title-field="name"
-                                                   :title="tt('Subcategory')"
-                                                   :items="secondaryCategoryOptions"
-                                                   v-model:show="showSubcategoryPopup"
-                                                   v-model="form.categoryId">
-                        </list-item-selection-popup>
-                    </f7-list-item>
-                    <f7-list-item
-                        link="#"
                         :header="tt('Transaction Template')"
                         :title="templateName"
+                        :footer="tt('Category and account are taken from the linked template, if any')"
                         @click="showTemplatePopup = true"
                     >
                         <list-item-selection-popup value-type="item"
@@ -212,6 +191,7 @@ import axios from 'axios';
 import { useI18n } from '@/locales/helpers.ts';
 import { useI18nUIComponents } from '@/lib/ui/mobile.ts';
 import { useUserStore } from '@/stores/user.ts';
+import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useTransactionTemplatesStore } from '@/stores/transactionTemplate.ts';
 import { useExchangeRatesStore } from '@/stores/exchangeRates.ts';
@@ -222,8 +202,8 @@ import {
     getUnixTimeFromLocalDatetime
 } from '@/lib/datetime.ts';
 import { getNextExpectedDate, SubscriptionFrequency, type SubscriptionFrequencyValue } from '@/lib/subscription.ts';
-import { CategoryType } from '@/core/category.ts';
 import { TemplateType } from '@/core/template.ts';
+import type { TransactionTemplate } from '@/models/transaction_template.ts';
 import type { LocalizedCurrencyInfo } from '@/core/currency.ts';
 import type { TextualYearMonthDay } from '@/core/datetime.ts';
 import type { ApiResponse } from '@/core/api.ts';
@@ -239,6 +219,7 @@ const {
 const { showToast } = useI18nUIComponents();
 
 const userStore = useUserStore();
+const accountsStore = useAccountsStore();
 const categoriesStore = useTransactionCategoriesStore();
 const templatesStore = useTransactionTemplatesStore();
 const exchangeRatesStore = useExchangeRatesStore();
@@ -253,7 +234,6 @@ interface RawSubscription {
     name: string;
     amount: string;
     currency: string;
-    categoryId: string;
     templateId: string;
     startDate: string;
     frequency: SubscriptionFrequencyValue;
@@ -266,7 +246,6 @@ interface Subscription {
     name: string;
     amount: number;
     currency: string;
-    categoryId: string;
     templateId: string;
     startDate: number;
     frequency: SubscriptionFrequencyValue;
@@ -284,8 +263,6 @@ const showFormPopup = ref<boolean>(false);
 const showDeleteActions = ref<boolean>(false);
 const showCurrencyPopup = ref<boolean>(false);
 const showStartDateSheet = ref<boolean>(false);
-const showCategoryPopup = ref<boolean>(false);
-const showSubcategoryPopup = ref<boolean>(false);
 const showFrequencyPopup = ref<boolean>(false);
 const showTemplatePopup = ref<boolean>(false);
 const editingSubscription = ref<Subscription | null>(null);
@@ -295,8 +272,6 @@ interface SubscriptionForm {
     name: string;
     amountRaw: string;
     currency: string;
-    primaryCategoryId: string;
-    categoryId: string;
     templateId: string;
     startDate: TextualYearMonthDay | undefined;
     frequency: SubscriptionFrequencyValue;
@@ -308,8 +283,6 @@ function defaultForm(): SubscriptionForm {
         name: '',
         amountRaw: '',
         currency: defaultCurrency.value,
-        primaryCategoryId: '0',
-        categoryId: '0',
         templateId: '0',
         startDate: parseDateTimeFromUnixTime(getUnixTimeFromLocalDatetime(new Date())).getGregorianCalendarYearDashMonthDashDay(),
         frequency: SubscriptionFrequency.Monthly,
@@ -333,30 +306,30 @@ function frequencyLabel(frequency: SubscriptionFrequencyValue): string {
     return frequencyOptions.value.find(option => option.value === frequency)?.label ?? '';
 }
 
-const expenseCategories = computed(() => categoriesStore.allTransactionCategories[CategoryType.Expense] || []);
-
-const primaryCategoryOptions = computed(() => {
+const templateOptions = computed(() => {
     const options: { id: string, name: string }[] = [{ id: '0', name: tt('None') }];
+    const normalTemplates = templatesStore.allTransactionTemplates[TemplateType.Normal.type] || [];
 
-    for (const category of expenseCategories.value) {
-        options.push({ id: category.id, name: category.name });
+    for (const template of normalTemplates) {
+        options.push({ id: template.id, name: template.name });
     }
 
     return options;
 });
 
-const secondaryCategoryOptions = computed(() => {
-    const primaryCategory = expenseCategories.value.find(category => category.id === form.value.primaryCategoryId);
-    return (primaryCategory?.subCategories || []).map(subCategory => ({ id: subCategory.id, name: subCategory.name }));
-});
+const templateName = computed(() => templateOptions.value.find(option => option.id === form.value.templateId)?.name ?? '');
 
-function onPrimaryCategoryChange(primaryCategoryId: string): void {
-    form.value.primaryCategoryId = primaryCategoryId;
-    const primaryCategory = expenseCategories.value.find(category => category.id === primaryCategoryId);
-    form.value.categoryId = primaryCategory?.subCategories?.[0]?.id ?? '0';
+function getTemplate(templateId: string): TransactionTemplate | undefined {
+    if (!templateId || templateId === '0') {
+        return undefined;
+    }
+
+    return templatesStore.allTransactionTemplatesMap[TemplateType.Normal.type]?.[templateId];
 }
 
-function categoryName(categoryId: string): string {
+function categoryNameFromTemplate(template: TransactionTemplate | undefined): string {
+    const categoryId = template?.getCategoryId();
+
     if (!categoryId || categoryId === '0') {
         return '';
     }
@@ -371,20 +344,32 @@ function categoryName(categoryId: string): string {
     return parentCategory ? `${parentCategory.name} > ${category.name}` : category.name;
 }
 
-const templateOptions = computed(() => {
-    const options: { id: string, name: string }[] = [{ id: '0', name: tt('None') }];
-    const normalTemplates = templatesStore.allTransactionTemplates[TemplateType.Normal.type] || [];
+interface AccountCoverage {
+    covered: boolean;
+    accountName: string;
+}
 
-    for (const template of normalTemplates) {
-        options.push({ id: template.id, name: template.name });
+function accountCoverage(subscription: Subscription, template: TransactionTemplate | undefined): AccountCoverage | undefined {
+    if (!template || !template.sourceAccountId || template.sourceAccountId === '0') {
+        return undefined;
     }
 
-    return options;
-});
+    const account = accountsStore.allPlainAccounts.find(a => a.id === template.sourceAccountId);
 
-const primaryCategoryName = computed(() => primaryCategoryOptions.value.find(option => option.id === form.value.primaryCategoryId)?.name ?? '');
-const subCategoryName = computed(() => secondaryCategoryOptions.value.find(option => option.id === form.value.categoryId)?.name ?? '');
-const templateName = computed(() => templateOptions.value.find(option => option.id === form.value.templateId)?.name ?? '');
+    if (!account) {
+        return undefined;
+    }
+
+    const neededInAccountCurrency = account.currency === subscription.currency
+        ? subscription.amount
+        : exchangeRatesStore.getExchangedAmount(subscription.amount, subscription.currency, account.currency);
+
+    if (neededInAccountCurrency === null) {
+        return undefined;
+    }
+
+    return { covered: account.balance >= neededInAccountCurrency, accountName: account.name };
+}
 
 // ── List items ─────────────────────────────────────────────
 
@@ -392,6 +377,7 @@ const tableItems = computed(() => subscriptions.value.map(subscription => {
     const convertedAmount = subscription.currency !== defaultCurrency.value
         ? exchangeRatesStore.getExchangedAmount(subscription.amount, subscription.currency, defaultCurrency.value)
         : null;
+    const template = getTemplate(subscription.templateId);
 
     return {
         raw: subscription,
@@ -401,7 +387,8 @@ const tableItems = computed(() => subscriptions.value.map(subscription => {
         convertedAmountDisplay: subscription.currency !== defaultCurrency.value && convertedAmount !== null
             ? formatAmountToLocalizedNumeralsWithCurrency(Math.round(convertedAmount), defaultCurrency.value)
             : '',
-        categoryName: categoryName(subscription.categoryId),
+        categoryName: categoryNameFromTemplate(template),
+        accountCoverage: accountCoverage(subscription, template),
         templateId: subscription.templateId,
         frequencyLabel: frequencyLabel(subscription.frequency),
         nextExpectedDateDisplay: formatGregorianTextualYearMonthDayToLongDate(parseDateTimeFromUnixTime(getNextExpectedDate(subscription.startDate, subscription.frequency)).getGregorianCalendarYearDashMonthDashDay()),
@@ -419,13 +406,10 @@ function openAddPopup(): void {
 
 function openEditPopup(subscription: Subscription): void {
     editingSubscription.value = subscription;
-    const category = subscription.categoryId !== '0' ? categoriesStore.allTransactionCategoriesMap[subscription.categoryId] : undefined;
     form.value = {
         name: subscription.name,
         amountRaw: formatAmountToLocalizedNumeralsWithoutDigitGrouping(subscription.amount, subscription.currency),
         currency: subscription.currency,
-        primaryCategoryId: category?.parentId && category.parentId !== '0' ? category.parentId : '0',
-        categoryId: subscription.categoryId,
         templateId: subscription.templateId,
         startDate: parseDateTimeFromUnixTime(subscription.startDate).getGregorianCalendarYearDashMonthDashDay(),
         frequency: subscription.frequency,
@@ -450,7 +434,6 @@ async function loadSubscriptions(): Promise<void> {
             name: s.name,
             amount: Number(s.amount),
             currency: s.currency,
-            categoryId: s.categoryId,
             templateId: s.templateId,
             startDate: Number(s.startDate),
             frequency: s.frequency,
@@ -477,7 +460,6 @@ async function saveSubscription(): Promise<void> {
             name: form.value.name,
             amount: String(parseAmountFromLocalizedNumerals(form.value.amountRaw)),
             currency: form.value.currency,
-            categoryId: form.value.categoryId,
             templateId: form.value.templateId,
             startDate: String(startUnix),
             frequency: form.value.frequency,
@@ -532,6 +514,11 @@ async function init(): Promise<void> {
         await templatesStore.loadAllTemplates({ templateType: TemplateType.Normal.type, force: false });
     } catch {
         // templates may already be loaded
+    }
+    try {
+        await accountsStore.loadAllAccounts({ force: false });
+    } catch {
+        // accounts may already be loaded
     }
     try {
         await exchangeRatesStore.getLatestExchangeRates({ silent: true, force: false });
@@ -612,5 +599,11 @@ function onPageAfterIn(): void {
     font-size: 0.8125rem;
     opacity: 0.7;
     margin-top: 2px;
+}
+
+.subscriptions-m-account-coverage {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
 }
 </style>

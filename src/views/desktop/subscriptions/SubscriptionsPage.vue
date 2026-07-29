@@ -26,6 +26,19 @@
                         <div v-if="item.primaryCategoryName">{{ item.primaryCategoryName }}</div>
                         <div class="text-medium-emphasis text-caption" v-if="item.subCategoryName">{{ item.subCategoryName }}</div>
                     </template>
+                    <template #item.accountCoverage="{ item }">
+                        <template v-if="item.accountCoverage">
+                            <v-icon
+                                :icon="item.accountCoverage.covered ? mdiCheckCircle : mdiCloseCircle"
+                                :color="item.accountCoverage.covered ? 'success' : 'error'"
+                                size="x-small"
+                            />
+                            <div class="text-medium-emphasis text-caption">
+                                {{ item.accountCoverage.accountName }}
+                                <v-tooltip activator="parent">{{ item.accountCoverage.accountBalanceDisplay }}</v-tooltip>
+                            </div>
+                        </template>
+                    </template>
                     <template #item.amountDisplay="{ item }">
                         <div>{{ item.amountDisplay }}</div>
                         <div class="text-medium-emphasis text-caption" v-if="item.convertedAmountDisplay">{{ item.convertedAmountDisplay }}</div>
@@ -119,34 +132,14 @@
                     hide-details
                 />
                 <v-select
-                    v-model="form.primaryCategoryId"
-                    :items="primaryCategoryOptions"
-                    item-title="name"
-                    item-value="id"
-                    :label="tt('Category')"
-                    density="compact"
-                    hide-details
-                    @update:model-value="onPrimaryCategoryChange"
-                />
-                <div v-if="form.primaryCategoryId !== '0'">
-                    <v-select
-                        v-model="form.categoryId"
-                        :items="secondaryCategoryOptions"
-                        item-title="name"
-                        item-value="id"
-                        :label="tt('Subcategory')"
-                        density="compact"
-                        :error-messages="formErrors.category ? [formErrors.category] : []"
-                    />
-                </div>
-                <v-select
                     v-model="form.templateId"
                     :items="templateOptions"
                     item-title="name"
                     item-value="id"
                     :label="tt('Transaction Template')"
+                    :hint="tt('Category and account are taken from the linked template, if any')"
+                    persistent-hint
                     density="compact"
-                    hide-details
                 />
                 <v-switch
                     v-model="form.isActive"
@@ -189,6 +182,7 @@ import axios from 'axios';
 
 import { useI18n } from '@/locales/helpers.ts';
 import { useUserStore } from '@/stores/user.ts';
+import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useTransactionTemplatesStore } from '@/stores/transactionTemplate.ts';
 import { useExchangeRatesStore } from '@/stores/exchangeRates.ts';
@@ -199,9 +193,9 @@ import {
     getUnixTimeFromLocalDatetime
 } from '@/lib/datetime.ts';
 import { getNextExpectedDate, SubscriptionFrequency, type SubscriptionFrequencyValue } from '@/lib/subscription.ts';
-import { CategoryType } from '@/core/category.ts';
 import { TemplateType } from '@/core/template.ts';
 import { TransactionEditPageType } from '@/views/base/transactions/TransactionEditPageBase.ts';
+import type { TransactionTemplate } from '@/models/transaction_template.ts';
 import type { TextualYearMonthDay } from '@/core/datetime.ts';
 import type { ApiResponse } from '@/core/api.ts';
 
@@ -210,6 +204,8 @@ import {
     mdiPlusCircle,
     mdiPencilOutline,
     mdiTrashCanOutline,
+    mdiCheckCircle,
+    mdiCloseCircle,
 } from '@mdi/js';
 
 type SnackBarType = InstanceType<typeof SnackBar>;
@@ -225,6 +221,7 @@ const {
 } = useI18n();
 
 const userStore = useUserStore();
+const accountsStore = useAccountsStore();
 const categoriesStore = useTransactionCategoriesStore();
 const templatesStore = useTransactionTemplatesStore();
 const exchangeRatesStore = useExchangeRatesStore();
@@ -238,7 +235,6 @@ interface RawSubscription {
     name: string;
     amount: string;
     currency: string;
-    categoryId: string;
     templateId: string;
     startDate: string;
     frequency: SubscriptionFrequencyValue;
@@ -251,7 +247,6 @@ interface Subscription {
     name: string;
     amount: number;
     currency: string;
-    categoryId: string;
     templateId: string;
     startDate: number;
     frequency: SubscriptionFrequencyValue;
@@ -275,7 +270,6 @@ interface SubscriptionFormErrors {
     name?: string;
     amount?: string;
     startDate?: string;
-    category?: string;
 }
 
 const formErrors = ref<SubscriptionFormErrors>({});
@@ -284,8 +278,6 @@ interface SubscriptionForm {
     name: string;
     amount: number;
     currency: string;
-    primaryCategoryId: string;
-    categoryId: string;
     templateId: string;
     startDate: TextualYearMonthDay | undefined;
     frequency: SubscriptionFrequencyValue;
@@ -297,8 +289,6 @@ function defaultForm(): SubscriptionForm {
         name: '',
         amount: 0,
         currency: defaultCurrency.value,
-        primaryCategoryId: '0',
-        categoryId: '0',
         templateId: '0',
         startDate: parseDateTimeFromUnixTime(getUnixTimeFromLocalDatetime(new Date())).getGregorianCalendarYearDashMonthDashDay(),
         frequency: SubscriptionFrequency.Monthly,
@@ -322,28 +312,28 @@ function frequencyLabel(frequency: SubscriptionFrequencyValue): string {
     return frequencyOptions.value.find(option => option.value === frequency)?.label ?? '';
 }
 
-const expenseCategories = computed(() => categoriesStore.allTransactionCategories[CategoryType.Expense] || []);
-
-const primaryCategoryOptions = computed(() => {
+const templateOptions = computed(() => {
     const options: { id: string, name: string }[] = [{ id: '0', name: tt('None') }];
+    const normalTemplates = templatesStore.allTransactionTemplates[TemplateType.Normal.type] || [];
 
-    for (const category of expenseCategories.value) {
-        options.push({ id: category.id, name: category.name });
+    for (const template of normalTemplates) {
+        options.push({ id: template.id, name: template.name });
     }
 
     return options;
 });
 
-const secondaryCategoryOptions = computed(() => {
-    const primaryCategory = expenseCategories.value.find(category => category.id === form.value.primaryCategoryId);
-    return (primaryCategory?.subCategories || []).map(subCategory => ({ id: subCategory.id, name: subCategory.name }));
-});
+function getTemplate(templateId: string): TransactionTemplate | undefined {
+    if (!templateId || templateId === '0') {
+        return undefined;
+    }
 
-function onPrimaryCategoryChange(): void {
-    form.value.categoryId = secondaryCategoryOptions.value[0]?.id ?? '0';
+    return templatesStore.allTransactionTemplatesMap[TemplateType.Normal.type]?.[templateId];
 }
 
-function categoryNameParts(categoryId: string): { primaryName: string, subName: string } {
+function categoryNamePartsFromTemplate(template: TransactionTemplate | undefined): { primaryName: string, subName: string } {
+    const categoryId = template?.getCategoryId();
+
     if (!categoryId || categoryId === '0') {
         return { primaryName: '', subName: '' };
     }
@@ -358,22 +348,44 @@ function categoryNameParts(categoryId: string): { primaryName: string, subName: 
     return parentCategory ? { primaryName: parentCategory.name, subName: category.name } : { primaryName: category.name, subName: '' };
 }
 
-const templateOptions = computed(() => {
-    const options: { id: string, name: string }[] = [{ id: '0', name: tt('None') }];
-    const normalTemplates = templatesStore.allTransactionTemplates[TemplateType.Normal.type] || [];
+interface AccountCoverage {
+    covered: boolean;
+    accountName: string;
+    accountBalanceDisplay: string;
+}
 
-    for (const template of normalTemplates) {
-        options.push({ id: template.id, name: template.name });
+function accountCoverage(subscription: Subscription, template: TransactionTemplate | undefined): AccountCoverage | undefined {
+    if (!template || !template.sourceAccountId || template.sourceAccountId === '0') {
+        return undefined;
     }
 
-    return options;
-});
+    const account = accountsStore.allPlainAccounts.find(a => a.id === template.sourceAccountId);
+
+    if (!account) {
+        return undefined;
+    }
+
+    const neededInAccountCurrency = account.currency === subscription.currency
+        ? subscription.amount
+        : exchangeRatesStore.getExchangedAmount(subscription.amount, subscription.currency, account.currency);
+
+    if (neededInAccountCurrency === null) {
+        return undefined;
+    }
+
+    return {
+        covered: account.balance >= neededInAccountCurrency,
+        accountName: account.name,
+        accountBalanceDisplay: formatAmountToLocalizedNumeralsWithCurrency(account.balance, account.currency),
+    };
+}
 
 // ── Table items ────────────────────────────────────────────
 
 const headers = computed(() => [
     { title: tt('Subscription Name'), key: 'name' },
     { title: tt('Category'), key: 'categoryName' },
+    { title: tt('Amount Covered'), key: 'accountCoverage', align: 'center' as const },
     { title: tt('Amount'), key: 'amountDisplay' },
     { title: tt('Next Expected Date'), key: 'nextExpectedDate', width: '240px' },
     { title: tt('Frequency'), key: 'frequencyLabel', align: 'center' as const },
@@ -385,7 +397,8 @@ const tableItems = computed(() => subscriptions.value.map(subscription => {
     const convertedAmount = subscription.currency !== defaultCurrency.value
         ? exchangeRatesStore.getExchangedAmount(subscription.amount, subscription.currency, defaultCurrency.value)
         : null;
-    const category = categoryNameParts(subscription.categoryId);
+    const template = getTemplate(subscription.templateId);
+    const category = categoryNamePartsFromTemplate(template);
 
     return {
         raw: subscription,
@@ -398,6 +411,7 @@ const tableItems = computed(() => subscriptions.value.map(subscription => {
         categoryName: [category.primaryName, category.subName].filter(Boolean).join(' '),
         primaryCategoryName: category.primaryName,
         subCategoryName: category.subName,
+        accountCoverage: accountCoverage(subscription, template),
         templateId: subscription.templateId,
         frequencyLabel: frequencyLabel(subscription.frequency),
         nextExpectedDate: getNextExpectedDate(subscription.startDate, subscription.frequency),
@@ -417,13 +431,10 @@ function openAddDialog(): void {
 
 function openEditDialog(subscription: Subscription): void {
     editingSubscription.value = subscription;
-    const category = subscription.categoryId !== '0' ? categoriesStore.allTransactionCategoriesMap[subscription.categoryId] : undefined;
     form.value = {
         name: subscription.name,
         amount: subscription.amount,
         currency: subscription.currency,
-        primaryCategoryId: category?.parentId && category.parentId !== '0' ? category.parentId : '0',
-        categoryId: subscription.categoryId,
         templateId: subscription.templateId,
         startDate: parseDateTimeFromUnixTime(subscription.startDate).getGregorianCalendarYearDashMonthDashDay(),
         frequency: subscription.frequency,
@@ -446,10 +457,6 @@ function validateForm(): boolean {
 
     if (!form.value.startDate) {
         errors.startDate = tt('Start date is required');
-    }
-
-    if (form.value.primaryCategoryId !== '0' && form.value.categoryId === '0') {
-        errors.category = tt('Please select a subcategory');
     }
 
     formErrors.value = errors;
@@ -491,7 +498,6 @@ async function loadSubscriptions(): Promise<void> {
             name: s.name,
             amount: Number(s.amount),
             currency: s.currency,
-            categoryId: s.categoryId,
             templateId: s.templateId,
             startDate: Number(s.startDate),
             frequency: s.frequency,
@@ -523,7 +529,6 @@ async function saveSubscription(): Promise<void> {
             name: form.value.name,
             amount: String(form.value.amount),
             currency: form.value.currency,
-            categoryId: form.value.categoryId,
             templateId: form.value.templateId,
             startDate: String(startUnix),
             frequency: form.value.frequency,
@@ -585,6 +590,11 @@ async function init(): Promise<void> {
         await templatesStore.loadAllTemplates({ templateType: TemplateType.Normal.type, force: false });
     } catch {
         // templates may already be loaded
+    }
+    try {
+        await accountsStore.loadAllAccounts({ force: false });
+    } catch {
+        // accounts may already be loaded
     }
     try {
         await exchangeRatesStore.getLatestExchangeRates({ silent: true, force: false });

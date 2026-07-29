@@ -54,7 +54,6 @@ func (s *SubscriptionService) CreateSubscription(c core.Context, uid int64, requ
 		Name:       request.Name,
 		Amount:     request.Amount,
 		Currency:   request.Currency,
-		CategoryId: request.CategoryId,
 		TemplateId: request.TemplateId,
 		StartDate:  request.StartDate,
 		Frequency:  request.Frequency,
@@ -102,7 +101,6 @@ func (s *SubscriptionService) UpdateSubscription(c core.Context, uid int64, requ
 	subscription.Name = request.Name
 	subscription.Amount = request.Amount
 	subscription.Currency = request.Currency
-	subscription.CategoryId = request.CategoryId
 	subscription.TemplateId = request.TemplateId
 	subscription.StartDate = request.StartDate
 	subscription.Frequency = request.Frequency
@@ -115,7 +113,7 @@ func (s *SubscriptionService) UpdateSubscription(c core.Context, uid int64, requ
 			return err
 		}
 
-		updatedRows, err := sess.ID(subscription.Id).Cols("name", "amount", "currency", "category_id", "template_id", "start_date", "frequency", "is_active").Where("uid=?", uid).Update(subscription)
+		updatedRows, err := sess.ID(subscription.Id).Cols("name", "amount", "currency", "template_id", "start_date", "frequency", "is_active").Where("uid=?", uid).Update(subscription)
 
 		if err != nil {
 			return err
@@ -184,17 +182,6 @@ func (s *SubscriptionService) DeleteSubscription(c core.Context, uid int64, id i
 }
 
 func (s *SubscriptionService) isSubscriptionValid(sess *xorm.Session, subscription *models.Subscription) error {
-	if subscription.CategoryId != 0 {
-		category := &models.TransactionCategory{}
-		has, err := sess.ID(subscription.CategoryId).Where("uid=? AND deleted=?", subscription.Uid, false).Get(category)
-
-		if err != nil {
-			return err
-		} else if !has || category.Type != models.CATEGORY_TYPE_EXPENSE {
-			return errs.ErrSubscriptionCategoryInvalid
-		}
-	}
-
 	if subscription.TemplateId != 0 {
 		template := &models.TransactionTemplate{}
 		has, err := sess.ID(subscription.TemplateId).Where("uid=? AND deleted=?", subscription.Uid, false).Get(template)
