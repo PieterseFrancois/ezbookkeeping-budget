@@ -237,6 +237,11 @@
                         <f7-icon f7="flag_2"></f7-icon>
                     </template>
                 </f7-list-item>
+                <f7-list-item popover-close link="/subscriptions" :title="tt('Subscriptions')">
+                    <template #media>
+                        <f7-icon f7="arrow_2_squarepath"></f7-icon>
+                    </template>
+                </f7-list-item>
             </f7-list>
         </f7-popover>
 

@@ -102,6 +102,12 @@
                         <span class="nav-item-title">{{ tt('Goals') }}</span>
                     </router-link>
                 </li>
+                <li class="nav-link">
+                    <router-link to="/subscriptions">
+                        <v-icon class="nav-item-icon" :icon="mdiCreditCardSync"/>
+                        <span class="nav-item-title">{{ tt('Subscriptions') }}</span>
+                    </router-link>
+                </li>
                 <li class="nav-section-title">
                     <div class="title-wrapper">
                         <span class="title-text">{{ tt('Miscellaneous') }}</span>
@@ -248,6 +254,7 @@ import {
     mdiHomeOutline,
     mdiWalletOutline,
     mdiFlagCheckered,
+    mdiCreditCardSync,
     mdiListBoxOutline,
     mdiPlusCircle,
     mdiCreditCardOutline,

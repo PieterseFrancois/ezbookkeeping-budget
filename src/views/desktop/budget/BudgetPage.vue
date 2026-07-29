@@ -9,7 +9,7 @@
                 class="ms-2"
                 @click="showHelpDialog = true"
             >
-                <v-icon :icon="mdiHelpCircleOutline" size="28" />
+                <v-icon :icon="mdiHelpCircleOutline" size="22" />
                 <v-tooltip activator="parent">{{ tt('How Budgeting Works') }}</v-tooltip>
             </v-btn>
             <v-spacer />

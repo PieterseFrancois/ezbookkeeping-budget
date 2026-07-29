@@ -198,6 +198,14 @@ func updateAllDatabaseTablesStructure(c *core.CliContext) error {
 
 	log.BootInfof(c, "[database.updateAllDatabaseTablesStructure] goal table maintained successfully")
 
+	err = datastore.Container.UserDataStore.SyncStructs(new(models.Subscription))
+
+	if err != nil {
+		return err
+	}
+
+	log.BootInfof(c, "[database.updateAllDatabaseTablesStructure] subscription table maintained successfully")
+
 	// Data migration: budget targets created before sections existed have an empty section.
 	// This is guarded on section='' so it is idempotent and a no-op on every subsequent start.
 	backfilled, err := services.BudgetTargets.BackfillBudgetTargetSections(c)

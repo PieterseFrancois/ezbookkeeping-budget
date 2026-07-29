@@ -489,6 +489,13 @@ func startWebServer(c *core.CliContext) error {
 			apiV1Route.POST("/goals/modify.json", bindApi(api.Goal.UpdateGoalHandler, config))
 			apiV1Route.POST("/goals/delete.json", bindApi(api.Goal.DeleteGoalHandler, config))
 
+			// Subscriptions
+			apiV1Route.GET("/subscriptions/list.json", bindApi(api.Subscription.SubscriptionsHandler, config))
+			apiV1Route.POST("/subscriptions/add.json", bindApi(api.Subscription.CreateSubscriptionHandler, config))
+			apiV1Route.POST("/subscriptions/modify.json", bindApi(api.Subscription.UpdateSubscriptionHandler, config))
+			apiV1Route.POST("/subscriptions/toggle.json", bindApi(api.Subscription.ToggleSubscriptionActiveHandler, config))
+			apiV1Route.POST("/subscriptions/delete.json", bindApi(api.Subscription.DeleteSubscriptionHandler, config))
+
 			// Large Language Models
 			if config.TextRecognitionLLMConfig != nil && config.TextRecognitionLLMConfig.LLMProvider != "" {
 				if config.TransactionFromAITextRecognition {
