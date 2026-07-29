@@ -172,6 +172,200 @@ func (s *BudgetService) GetBudgetActuals(c core.Context, uid int64, startTime in
 	return result, nil
 }
 
+// GetLiabilityReserves returns the debt/reserve view per liability account for the given cycle:
+// what is owed (from the account balance) plus new charges and payments within the cycle.
+// This is a factual cash-flow view of debt, so budget exclusions are intentionally not applied here.
+func (s *BudgetService) GetLiabilityReserves(c core.Context, uid int64, startTime int64, endTime int64) ([]*models.BudgetLiabilityReserveItem, error) {
+	if uid <= 0 {
+		return nil, errs.ErrUserIdInvalid
+	}
+
+	var accounts []*models.Account
+	err := s.UserDataDB(uid).NewSession(c).
+		Where("uid=? AND deleted=?", uid, false).
+		Find(&accounts)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Keep leaf liability accounts (exclude multi-sub parent accounts, whose sub-accounts carry the balances/transactions)
+	reserves := make(map[int64]*models.BudgetLiabilityReserveItem)
+	accountIds := make([]int64, 0)
+
+	for _, a := range accounts {
+		if !a.Category.IsLiability() || a.Type == models.ACCOUNT_TYPE_MULTI_SUB_ACCOUNTS {
+			continue
+		}
+
+		reserves[a.AccountId] = &models.BudgetLiabilityReserveItem{
+			AccountId: a.AccountId,
+			Name:      a.Name,
+			Icon:      a.Icon,
+			Color:     a.Color,
+			Currency:  a.Currency,
+			Owed:      -a.Balance, // liability balances are stored negative; owed magnitude is the negation
+		}
+		accountIds = append(accountIds, a.AccountId)
+	}
+
+	if len(accountIds) == 0 {
+		return []*models.BudgetLiabilityReserveItem{}, nil
+	}
+
+	minTransactionTime := utils.GetMinTransactionTimeFromUnixTime(startTime)
+	maxTransactionTime := utils.GetMaxTransactionTimeFromUnixTime(endTime)
+
+	var transactions []*models.Transaction
+	err = s.UserDataDB(uid).NewSession(c).
+		Select("type, account_id, amount").
+		Where("uid=? AND deleted=? AND transaction_time>=? AND transaction_time<=?",
+			uid, false, minTransactionTime, maxTransactionTime).
+		In("account_id", accountIds).
+		In("type", models.TRANSACTION_DB_TYPE_EXPENSE, models.TRANSACTION_DB_TYPE_TRANSFER_IN).
+		Find(&transactions)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, t := range transactions {
+		r := reserves[t.AccountId]
+
+		if r == nil {
+			continue
+		}
+
+		switch t.Type {
+		case models.TRANSACTION_DB_TYPE_EXPENSE:
+			r.CycleSpend += t.Amount // a purchase charged to the card increases what is owed
+		case models.TRANSACTION_DB_TYPE_TRANSFER_IN:
+			r.CyclePayments += t.Amount // a transfer into the card is a repayment
+		}
+	}
+
+	result := make([]*models.BudgetLiabilityReserveItem, 0, len(accountIds))
+
+	for _, id := range accountIds {
+		result = append(result, reserves[id])
+	}
+
+	return result, nil
+}
+
+// naturalSectionForCategory returns the section a budget target belongs to when none was specified.
+// Expense/income categories map by type; transfer categories map by their parent category name.
+func naturalSectionForCategory(category *models.TransactionCategory, parentName string) string {
+	switch category.Type {
+	case models.CATEGORY_TYPE_EXPENSE:
+		return models.BUDGET_SECTION_EXPENSE
+	case models.CATEGORY_TYPE_INCOME:
+		return models.BUDGET_SECTION_INCOME
+	case models.CATEGORY_TYPE_TRANSFER:
+		if parentName == models.DebtTransferParentName {
+			return models.BUDGET_SECTION_DEBT
+		}
+		// Savings & Investments, and anything else transfer-shaped, is a contribution
+		return models.BUDGET_SECTION_SAVINGS
+	default:
+		return models.BUDGET_SECTION_EXPENSE
+	}
+}
+
+// resolveNaturalSection looks up a single category and returns the section it naturally belongs to.
+func (s *BudgetService) resolveNaturalSection(c core.Context, uid int64, categoryId int64) (string, error) {
+	category := &models.TransactionCategory{}
+	has, err := s.UserDataDB(uid).NewSession(c).ID(categoryId).Where("uid=?", uid).Get(category)
+
+	if err != nil {
+		return "", err
+	} else if !has {
+		return "", errs.ErrTransactionCategoryNotFound
+	}
+
+	parentName := ""
+
+	if category.ParentCategoryId > models.LevelOneTransactionCategoryParentId {
+		parent := &models.TransactionCategory{}
+		hasParent, err := s.UserDataDB(uid).NewSession(c).ID(category.ParentCategoryId).Where("uid=?", uid).Get(parent)
+
+		if err != nil {
+			return "", err
+		} else if hasParent {
+			parentName = parent.Name
+		}
+	}
+
+	return naturalSectionForCategory(category, parentName), nil
+}
+
+// BackfillBudgetTargetSections fills in the section on budget targets created before sections existed.
+// It only touches rows with an empty section, so it is idempotent and safe to run on every startup.
+// Runs across every user-data shard, so it needs no user enumeration. Returns the number of rows updated.
+func (s *BudgetService) BackfillBudgetTargetSections(c core.Context) (int, error) {
+	totalUpdated := 0
+
+	for i := 0; i < s.UserDataDBCount(); i++ {
+		db := s.UserDataDBByIndex(i)
+
+		var targets []*models.BudgetTarget
+		err := db.NewSession(c).Where("section=? OR section IS NULL", "").Find(&targets)
+
+		if err != nil {
+			return totalUpdated, err
+		}
+
+		if len(targets) == 0 {
+			continue
+		}
+
+		var categories []*models.TransactionCategory
+		err = db.NewSession(c).Find(&categories)
+
+		if err != nil {
+			return totalUpdated, err
+		}
+
+		categoryMap := make(map[int64]*models.TransactionCategory, len(categories))
+		for _, cat := range categories {
+			categoryMap[cat.CategoryId] = cat
+		}
+
+		err = db.DoTransaction(c, func(sess *xorm.Session) error {
+			for _, target := range targets {
+				category := categoryMap[target.CategoryId]
+
+				if category == nil {
+					// Category no longer exists; default to expense so the row is never left blank
+					target.Section = models.BUDGET_SECTION_EXPENSE
+				} else {
+					parentName := ""
+
+					if parent := categoryMap[category.ParentCategoryId]; parent != nil {
+						parentName = parent.Name
+					}
+
+					target.Section = naturalSectionForCategory(category, parentName)
+				}
+
+				if _, err := sess.ID(target.Id).Cols("section").Update(target); err != nil {
+					return err
+				}
+
+				totalUpdated++
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return totalUpdated, err
+		}
+	}
+
+	return totalUpdated, nil
+}
+
 // GetBudgetTargets returns all budget targets for the given user, year and month
 func (s *BudgetService) GetBudgetTargets(c core.Context, uid int64, year int, month int) ([]*models.BudgetTarget, error) {
 	if uid <= 0 {
@@ -190,8 +384,21 @@ func (s *BudgetService) CreateBudgetTarget(c core.Context, uid int64, request *m
 		return nil, errs.ErrUserIdInvalid
 	}
 
+	section := request.Section
+
+	if section == "" {
+		// Older clients omit the section; resolve the category's natural one so the row is never left blank
+		natural, err := s.resolveNaturalSection(c, uid, request.CategoryId)
+
+		if err != nil {
+			return nil, err
+		}
+
+		section = natural
+	}
+
 	exists, err := s.UserDataDB(uid).NewSession(c).
-		Where("uid=? AND category_id=? AND year=? AND month=?", uid, request.CategoryId, request.Year, request.Month).
+		Where("uid=? AND category_id=? AND section=? AND year=? AND month=?", uid, request.CategoryId, section, request.Year, request.Month).
 		Exist(&models.BudgetTarget{})
 
 	if err != nil {
@@ -204,6 +411,7 @@ func (s *BudgetService) CreateBudgetTarget(c core.Context, uid int64, request *m
 		Id:         s.GenerateUuid(uuid.UUID_TYPE_BUDGET),
 		Uid:        uid,
 		CategoryId: request.CategoryId,
+		Section:    section,
 		Year:       request.Year,
 		Month:      request.Month,
 		Amount:     request.Amount,

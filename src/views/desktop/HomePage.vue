@@ -385,9 +385,11 @@ async function loadBudgetOverview(): Promise<void> {
         if (sections['expense']) {
             spentBySubcategoryId[catId] = sections['expense'];
         }
-        const net = (sections['savings'] ?? 0) - (sections['income'] ?? 0);
-        if (net !== 0) {
-            savingsNetBySubId[catId] = net;
+        // Gross set-aside: savings contributions plus card/debt paydowns. Withdrawals are not
+        // netted off — they are income, and the overview card tracks progress toward targets.
+        const setAside = (sections['savings'] ?? 0) + (sections['debt'] ?? 0);
+        if (setAside !== 0) {
+            savingsNetBySubId[catId] = setAside;
         }
     }
 

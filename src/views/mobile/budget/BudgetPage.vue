@@ -4,6 +4,7 @@
             <f7-nav-left :back-link="tt('Back')"></f7-nav-left>
             <f7-nav-title>{{ tt('Budget') }}</f7-nav-title>
             <f7-nav-right>
+                <f7-link icon-f7="question_circle" @click="showHelpPopup = true" />
                 <f7-link icon-f7="doc_on_doc" :class="{ disabled: loading }" @click="openCopyPopup" />
             </f7-nav-right>
         </f7-navbar>
@@ -65,6 +66,16 @@
                     <span class="budget-m-amt-cell">{{ fmt(colSavingsActual) }}</span>
                     <span class="budget-m-amt-cell" :class="savingsDiffClass(colSavingsDiff)">{{ fmt(colSavingsDiff) }}</span>
                 </div>
+                <!-- Cards & Debt row -->
+                <div class="budget-m-row budget-m-summary-row" @click="showDebtSection = !showDebtSection">
+                    <div class="budget-m-name-cell budget-m-summary-name">
+                        <f7-icon :f7="showDebtSection ? 'chevron_down' : 'chevron_right'" size="14" class="budget-m-chevron" />
+                        <span>{{ tt('Cards & Debt') }}</span>
+                    </div>
+                    <span class="budget-m-amt-cell">{{ fmt(colDebtBudgeted) }}</span>
+                    <span class="budget-m-amt-cell">{{ fmt(colDebtActual) }}</span>
+                    <span class="budget-m-amt-cell" :class="savingsDiffClass(colDebtDiff)">{{ fmt(colDebtDiff) }}</span>
+                </div>
                 <!-- Net row -->
                 <div class="budget-m-row">
                     <div class="budget-m-name-cell budget-m-net-name">{{ tt('Net') }}</div>
@@ -97,7 +108,9 @@
         <template v-else>
             <!-- Expense section -->
             <template v-if="showExpenseSection">
-                <div class="budget-m-section-label">{{ tt('Expenses') }}</div>
+                <div class="budget-m-section-label">
+                    {{ tt('Expenses') }}<span class="budget-m-section-hint">{{ tt('money out') }}</span>
+                </div>
                 <template v-for="parent in allExpenseParents" :key="parent.id">
                     <template v-if="isParentVisible(parent)">
                         <div class="budget-m-row budget-m-parent-row" @click="toggleExpanded(parent.id)">
@@ -150,7 +163,9 @@
 
             <!-- Income section -->
             <template v-if="showIncomeSection">
-                <div class="budget-m-section-label">{{ tt('Income') }}</div>
+                <div class="budget-m-section-label">
+                    {{ tt('Income') }}<span class="budget-m-section-hint">{{ tt('money in') }}</span>
+                </div>
                 <template v-for="parent in allIncomeParents" :key="parent.id">
                     <template v-if="isParentVisible(parent)">
                         <div class="budget-m-row budget-m-parent-row" @click="toggleExpanded(parent.id)">
@@ -197,13 +212,34 @@
                         </template>
                     </template>
                 </template>
+
+                <!-- Savings withdrawals surface here as income, budgetable on the same category -->
+                <div v-for="w in withdrawalItems" :key="'wd-' + w.id" class="budget-m-row budget-m-sub-row">
+                    <span class="budget-m-name-cell budget-m-sub-name">{{ w.parentName }} › {{ w.name }}</span>
+                    <div class="budget-m-amt-cell budget-m-budgeted-cell" @click="startEdit(w.id, w.name, 'income')">
+                        <span :class="{ 'budget-m-zero': subWithdrawalBudgeted(w.id) === 0 }">{{ fmt(subWithdrawalBudgeted(w.id)) }}</span>
+                    </div>
+                    <span class="budget-m-amt-cell">{{ fmt(w.amount) }}</span>
+                    <span class="budget-m-amt-cell" :class="diffClass(w.amount - subWithdrawalBudgeted(w.id))">{{ fmt(w.amount - subWithdrawalBudgeted(w.id)) }}</span>
+                    <div class="budget-m-eye-cell">
+                        <f7-link
+                            v-if="w.amount === 0 && subWithdrawalBudgeted(w.id) === 0"
+                            class="budget-m-eye-btn"
+                            @click.stop="removeWithdrawalCategory(w.id)"
+                        >
+                            <f7-icon f7="eye_slash" size="18" />
+                        </f7-link>
+                    </div>
+                </div>
             </template>
 
             <div v-if="(showExpenseSection || showIncomeSection) && showSavingsSection" class="budget-m-section-divider" />
 
             <!-- Savings section -->
             <template v-if="showSavingsSection">
-                <div class="budget-m-section-label">{{ tt('Savings') }}</div>
+                <div class="budget-m-section-label">
+                    {{ tt('Savings') }}<span class="budget-m-section-hint">{{ tt('money out — set aside') }}</span>
+                </div>
                 <template v-for="parent in allTransferParents" :key="parent.id">
                     <template v-if="isSavingsParentVisible(parent)">
                         <div class="budget-m-row budget-m-parent-row" @click="toggleExpanded(parent.id)">
@@ -231,7 +267,7 @@
                                     class="budget-m-row budget-m-sub-row"
                                 >
                                     <span class="budget-m-name-cell budget-m-sub-name">{{ sub.name }}</span>
-                                    <div class="budget-m-amt-cell budget-m-budgeted-cell" @click="startEdit(sub.id, sub.name)">
+                                    <div class="budget-m-amt-cell budget-m-budgeted-cell" @click="startEdit(sub.id, sub.name, 'savings')">
                                         <span :class="{ 'budget-m-zero': subSavingsBudgeted(sub.id) === 0 }">{{ fmt(subSavingsBudgeted(sub.id)) }}</span>
                                     </div>
                                     <span class="budget-m-amt-cell">{{ fmt(subSavingsActual(sub.id)) }}</span>
@@ -252,11 +288,85 @@
                 </template>
             </template>
 
+            <div v-if="(showExpenseSection || showIncomeSection || showSavingsSection) && showDebtSection" class="budget-m-section-divider" />
+
+            <!-- Cards & Debt section -->
+            <template v-if="showDebtSection">
+                <div class="budget-m-section-label">
+                    {{ tt('Cards & Debt') }}<span class="budget-m-section-hint">{{ tt('money out — paydown') }}</span>
+                </div>
+                <template v-for="parent in allDebtParents" :key="parent.id">
+                    <template v-if="isDebtParentVisible(parent)">
+                        <div class="budget-m-row budget-m-parent-row" @click="toggleExpanded(parent.id)">
+                            <div class="budget-m-name-cell budget-m-parent-name">
+                                <f7-icon :f7="expandedParents.has(parent.id) ? 'chevron_down' : 'chevron_right'" size="14" class="budget-m-chevron" />
+                                <span class="budget-m-parent-label">{{ parent.name }}</span>
+                            </div>
+                            <span class="budget-m-amt-cell">{{ fmt(parentDebtBudgeted(parent)) }}</span>
+                            <span class="budget-m-amt-cell">{{ fmt(parentDebtActual(parent)) }}</span>
+                            <span class="budget-m-amt-cell" :class="savingsDiffClass(parentDebtRemaining(parent))">{{ fmt(parentDebtRemaining(parent)) }}</span>
+                            <div class="budget-m-eye-cell">
+                                <f7-link
+                                    v-if="!hiddenCategoryIds.has(parent.id) && parentDebtBudgeted(parent) === 0"
+                                    class="budget-m-eye-btn"
+                                    @click.stop="onHideParent(parent)"
+                                >
+                                    <f7-icon f7="eye_slash" size="18" />
+                                </f7-link>
+                            </div>
+                        </div>
+                        <template v-if="expandedParents.has(parent.id)">
+                            <template v-for="sub in (parent.subCategories ?? [])" :key="sub.id">
+                                <div
+                                    v-if="isDebtSubVisible(sub.id)"
+                                    class="budget-m-row budget-m-sub-row"
+                                >
+                                    <span class="budget-m-name-cell budget-m-sub-name">{{ sub.name }}</span>
+                                    <div class="budget-m-amt-cell budget-m-budgeted-cell" @click="startEdit(sub.id, sub.name, 'debt')">
+                                        <span :class="{ 'budget-m-zero': subDebtBudgeted(sub.id) === 0 }">{{ fmt(subDebtBudgeted(sub.id)) }}</span>
+                                    </div>
+                                    <span class="budget-m-amt-cell">{{ fmt(subDebtActual(sub.id)) }}</span>
+                                    <span class="budget-m-amt-cell" :class="savingsDiffClass(subDebtRemaining(sub.id))">{{ fmt(subDebtRemaining(sub.id)) }}</span>
+                                    <div class="budget-m-eye-cell">
+                                        <f7-link
+                                            v-if="!hiddenCategoryIds.has(sub.id) && subDebtBudgeted(sub.id) === 0"
+                                            class="budget-m-eye-btn"
+                                            @click.stop="onHideSub(sub.id)"
+                                        >
+                                            <f7-icon f7="eye_slash" size="18" />
+                                        </f7-link>
+                                    </div>
+                                </div>
+                            </template>
+                        </template>
+                    </template>
+                </template>
+            </template>
+
             <!-- Empty state -->
             <div v-if="!hasAnyData" class="budget-m-empty">
                 <span>{{ tt('No categories available to add') }}</span>
             </div>
         </template>
+
+        <!-- Cards & Debt reserve panel -->
+        <f7-card v-if="!loading && liabilityReserves.length > 0" class="budget-m-reserve-card">
+            <f7-card-header class="budget-m-reserve-header">{{ tt('Cards & Debt') }}</f7-card-header>
+            <f7-card-content :padding="false">
+                <div v-for="r in liabilityReserves" :key="r.accountId" class="budget-m-reserve-row">
+                    <div class="budget-m-reserve-main">
+                        <span class="budget-m-reserve-name">{{ r.name }}</span>
+                        <span class="budget-m-reserve-owed" :class="r.owed > 0 ? 'text-color-red' : 'text-color-green'">
+                            {{ r.owed > 0 ? tt('Owed') : tt('Settled') }} {{ fmtCurrency(Math.abs(r.owed), r.currency) }}
+                        </span>
+                    </div>
+                    <div class="budget-m-reserve-sub">
+                        <span>{{ tt('Charged') }} {{ fmtCurrency(r.cycleSpend, r.currency) }}</span>
+                        <span>{{ tt('Paid') }} {{ fmtCurrency(r.cyclePayments, r.currency) }}</span>
+                    </div>
+                </div>
+            </f7-card-content>
+        </f7-card>
 
         <!-- Add category button -->
         <div v-if="hasHiddenItems" class="margin">
@@ -270,6 +380,9 @@
             v-model:show="showNumPad"
             v-model="editingAmount"
         />
+
+        <!-- Help Popup -->
+        <budget-help-popup v-model:opened="showHelpPopup" />
 
         <!-- Copy Budget Popup -->
         <f7-popup v-model:opened="showCopyPopup" tablet-fullscreen>
@@ -462,6 +575,36 @@
                     >
                         <template #media><f7-icon f7="plus_circle" /></template>
                     </f7-list-item>
+                    <f7-list-item
+                        v-for="parent in hiddenDebtParents"
+                        :key="'dp-' + parent.id"
+                        link="#" no-chevron
+                        :title="parent.name"
+                        :footer="tt('Cards & Debt')"
+                        @click="onAddParent(parent)"
+                    >
+                        <template #media><f7-icon f7="plus_circle" /></template>
+                    </f7-list-item>
+                    <f7-list-item
+                        v-for="item in hiddenDebtSubsUnderVisibleParent"
+                        :key="'ds-' + item.sub.id"
+                        link="#" no-chevron
+                        :title="item.sub.name"
+                        :footer="item.parent.name + ' · ' + tt('Cards & Debt')"
+                        @click="onAddSub(item.sub.id)"
+                    >
+                        <template #media><f7-icon f7="plus_circle" /></template>
+                    </f7-list-item>
+                    <f7-list-item
+                        v-for="item in availableWithdrawalSubs"
+                        :key="'wa-' + item.sub.id"
+                        link="#" no-chevron
+                        :title="item.sub.name"
+                        :footer="item.parent.name + ' · ' + tt('Withdrawal') + ' (' + tt('Income') + ')'"
+                        @click="onAddWithdrawal(item.sub.id)"
+                    >
+                        <template #media><f7-icon f7="plus_circle" /></template>
+                    </f7-list-item>
                 </f7-list>
                 <f7-block v-else>
                     <p>{{ tt('No categories available to add') }}</p>
@@ -473,12 +616,13 @@
 
 <script setup lang="ts">
 import NumberPadSheet from '@/components/mobile/NumberPadSheet.vue';
+import BudgetHelpPopup from '@/views/mobile/budget/BudgetHelpPopup.vue';
 
 import { ref, computed, watch } from 'vue';
 
 import { useI18n } from '@/locales/helpers.ts';
 import { useI18nUIComponents } from '@/lib/ui/mobile.ts';
-import { useBudgetPageBase, type CopyDecision, addMonths } from '@/views/base/BudgetPageBase.ts';
+import { useBudgetPageBase, type CopyDecision, type BudgetSection, addMonths } from '@/views/base/BudgetPageBase.ts';
 
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useUserStore } from '@/stores/user.ts';
@@ -487,6 +631,23 @@ import { CategoryType } from '@/core/category.ts';
 import type { TransactionCategory } from '@/models/transaction_category.ts';
 import { parseDateTimeFromUnixTime } from '@/lib/datetime.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
+import axios from 'axios';
+import type { ApiResponse } from '@/core/api.ts';
+
+// Transfer parent categories that map to the Savings and Cards & Debt sections
+const SAVINGS_PARENT_NAME = 'Savings & Investments';
+const DEBT_PARENT_NAME = 'Loan & Debt';
+
+interface LiabilityReserve {
+    accountId: string;
+    name: string;
+    icon: string;
+    color: string;
+    currency: string;
+    owed: number;
+    cycleSpend: number;
+    cyclePayments: number;
+}
 
 const {
     tt,
@@ -500,15 +661,21 @@ const {
     selectedYear,
     selectedMonth,
     hiddenCategoryIds,
+    withdrawalCategoryIds,
     budgetTargets,
     budgetActuals,
     selectMonth,
     loadBudgetTargets,
     loadBudgetActuals,
     getExpenseIncomeActual,
-    getSavingsNet,
+    getSectionActual,
+    getTargetAmount,
+    cycleFirstUnixTime,
+    cycleLastUnixTime,
     saveBudgetTarget,
     copyBudgetFromMonth,
+    addWithdrawalCategory,
+    removeWithdrawalCategory,
     hideCategoryWithChildren,
     hideCategory,
     unhideCategory,
@@ -537,12 +704,15 @@ const budgetCycleNote = computed<string>(() => {
 const loading = ref<boolean>(true);
 const expandedParents = ref<Set<string>>(new Set());
 const saving = ref<boolean>(false);
+const liabilityReserves = ref<LiabilityReserve[]>([]);
 const showIncomeSection = ref<boolean>(true);
 const showExpenseSection = ref<boolean>(true);
 const showSavingsSection = ref<boolean>(true);
+const showDebtSection = ref<boolean>(true);
 
 const showNumPad = ref<boolean>(false);
 const editingSubId = ref<string>('');
+const editingSubSection = ref<BudgetSection>('expense');
 const editingSubName = ref<string>('');
 const editingAmount = ref<number>(0);
 
@@ -554,6 +724,7 @@ const copyLoading = ref<boolean>(false);
 
 interface CopyItem {
     subcategoryId: string;
+    section: BudgetSection;
     subcategoryName: string;
     parentCategoryId: string;
     parentCategoryName: string;
@@ -566,6 +737,7 @@ interface CopyItem {
 const copyItems = ref<CopyItem[]>([]);
 
 const showAddSheet = ref<boolean>(false);
+const showHelpPopup = ref<boolean>(false);
 
 // ---------- Timeline chip refs ----------
 
@@ -587,7 +759,12 @@ const allIncomeParents = computed<TransactionCategory[]>(() =>
 
 const allTransferParents = computed<TransactionCategory[]>(() =>
     ((categoriesStore.allTransactionCategories[CategoryType.Transfer] ?? []) as TransactionCategory[])
-        .filter(p => p.name === 'Savings & Investments')
+        .filter(p => p.name === SAVINGS_PARENT_NAME)
+);
+
+const allDebtParents = computed<TransactionCategory[]>(() =>
+    ((categoriesStore.allTransactionCategories[CategoryType.Transfer] ?? []) as TransactionCategory[])
+        .filter(p => p.name === DEBT_PARENT_NAME)
 );
 
 const hiddenExpenseParents = computed<TransactionCategory[]>(() =>
@@ -600,6 +777,10 @@ const hiddenIncomeParents = computed<TransactionCategory[]>(() =>
 
 const hiddenSavingsParents = computed<TransactionCategory[]>(() =>
     allTransferParents.value.filter(p => hiddenCategoryIds.value.has(p.id))
+);
+
+const hiddenDebtParents = computed<TransactionCategory[]>(() =>
+    allDebtParents.value.filter(p => hiddenCategoryIds.value.has(p.id))
 );
 
 interface HiddenSubItem { sub: TransactionCategory; parent: TransactionCategory; }
@@ -637,17 +818,32 @@ const hiddenSavingsSubsUnderVisibleParent = computed<HiddenSubItem[]>(() => {
     return result;
 });
 
+const hiddenDebtSubsUnderVisibleParent = computed<HiddenSubItem[]>(() => {
+    const result: HiddenSubItem[] = [];
+    for (const parent of allDebtParents.value) {
+        if (hiddenCategoryIds.value.has(parent.id)) continue;
+        for (const sub of (parent.subCategories ?? [])) {
+            if (hiddenCategoryIds.value.has(sub.id)) result.push({ sub, parent });
+        }
+    }
+    return result;
+});
+
 const hasHiddenItems = computed<boolean>(() =>
     hiddenExpenseParents.value.length > 0 ||
     hiddenIncomeParents.value.length > 0 ||
     hiddenExpenseSubsUnderVisibleParent.value.length > 0 ||
     hiddenIncomeSubsUnderVisibleParent.value.length > 0 ||
     hiddenSavingsParents.value.length > 0 ||
-    hiddenSavingsSubsUnderVisibleParent.value.length > 0
+    hiddenSavingsSubsUnderVisibleParent.value.length > 0 ||
+    hiddenDebtParents.value.length > 0 ||
+    hiddenDebtSubsUnderVisibleParent.value.length > 0 ||
+    availableWithdrawalSubs.value.length > 0
 );
 
 const hasAnyData = computed<boolean>(() =>
-    allExpenseParents.value.length > 0 || allIncomeParents.value.length > 0 || allTransferParents.value.length > 0
+    allExpenseParents.value.length > 0 || allIncomeParents.value.length > 0 ||
+    allTransferParents.value.length > 0 || allDebtParents.value.length > 0
 );
 
 const nowDate = new Date();
@@ -711,6 +907,10 @@ function fmt(amount: number): string {
         .replace(/[,.]00$/, '');
 }
 
+function fmtCurrency(amount: number, currency: string): string {
+    return formatAmountToLocalizedNumeralsWithCurrency(amount, currency);
+}
+
 function diffClass(diff: number): string {
     if (diff > 0) return 'text-color-green';
     if (diff < 0) return 'text-color-red';
@@ -719,9 +919,16 @@ function diffClass(diff: number): string {
 
 // ---------- Amount calculations (single-column helpers using col) ----------
 
+// Expense and income categories map to their section unambiguously by type, so the
+// expense/income helpers can resolve it rather than threading it through every call site.
+function sectionForCategory(subcatId: string): BudgetSection {
+    const cat = categoriesStore.allTransactionCategoriesMap[subcatId];
+    return cat?.type === CategoryType.Income ? 'income' : 'expense';
+}
+
 function subBudgeted(subcatId: string): number {
     const c = col.value;
-    return budgetTargets.value[`${c.year}-${c.month}`]?.[subcatId]?.amount ?? 0;
+    return getTargetAmount(subcatId, sectionForCategory(subcatId), c.year, c.month);
 }
 
 function subActual(subcatId: string): number {
@@ -760,12 +967,21 @@ function isParentVisible(parent: TransactionCategory): boolean {
 
 function subSavingsBudgeted(subcatId: string): number {
     const c = col.value;
-    return budgetTargets.value[`${c.year}-${c.month}`]?.[subcatId]?.amount ?? 0;
+    return getTargetAmount(subcatId, 'savings', c.year, c.month);
 }
 
+// Gross contribution into savings. Withdrawals are NOT netted off here — they surface
+// separately as income lines (see subWithdrawalActual), so a R2000 deposit still reads
+// as R2000 toward the goal even if R500 was later withdrawn.
 function subSavingsActual(subcatId: string): number {
     const c = col.value;
-    return getSavingsNet(subcatId, c.year, c.month);
+    return getSectionActual(subcatId, 'savings', c.year, c.month);
+}
+
+// Money taken back out of a savings/investment account, classified as income.
+function subWithdrawalActual(subcatId: string): number {
+    const c = col.value;
+    return getSectionActual(subcatId, 'income', c.year, c.month);
 }
 
 function subSavingsRemaining(subcatId: string): number {
@@ -793,10 +1009,87 @@ function isSavingsParentVisible(parent: TransactionCategory): boolean {
     return (parent.subCategories ?? []).some(sub => subSavingsBudgeted(sub.id) > 0 || subSavingsActual(sub.id) !== 0);
 }
 
+// Budgeted withdrawal for a savings category — a target on the same category but in the income
+// section, independent of its contribution target.
+function subWithdrawalBudgeted(subcatId: string): number {
+    const c = col.value;
+    return getTargetAmount(subcatId, 'income', c.year, c.month);
+}
+
+// Savings subcategories shown in the Income section: those withdrawn from this cycle, any with a
+// planned withdrawal target, plus any explicitly added via the Add Category sheet (which is how
+// you budget a withdrawal before one has happened).
+const withdrawalItems = computed<{ id: string; name: string; parentName: string; amount: number }[]>(() => {
+    const items: { id: string; name: string; parentName: string; amount: number }[] = [];
+    for (const parent of allTransferParents.value) {
+        for (const sub of (parent.subCategories ?? [])) {
+            const amount = subWithdrawalActual(sub.id);
+            if (amount !== 0 || subWithdrawalBudgeted(sub.id) > 0 || withdrawalCategoryIds.value.has(sub.id)) {
+                items.push({ id: sub.id, name: sub.name, parentName: parent.name, amount });
+            }
+        }
+    }
+    return items;
+});
+
+// Savings subcategories not yet surfaced as withdrawal rows — offered in the Add Category sheet
+const availableWithdrawalSubs = computed<HiddenSubItem[]>(() => {
+    const result: HiddenSubItem[] = [];
+    for (const parent of allTransferParents.value) {
+        for (const sub of (parent.subCategories ?? [])) {
+            if (withdrawalCategoryIds.value.has(sub.id)) continue;
+            if (subWithdrawalActual(sub.id) !== 0 || subWithdrawalBudgeted(sub.id) > 0) continue;
+            result.push({ sub, parent });
+        }
+    }
+    return result;
+});
+
+const withdrawalTotal = computed<number>(() =>
+    withdrawalItems.value.reduce((sum, i) => sum + i.amount, 0)
+);
+
 function savingsDiffClass(amount: number): string {
     if (amount > 0) return 'text-color-red';
     if (amount < 0) return 'text-color-green';
     return '';
+}
+
+// ---------- Cards & Debt single-column helpers (paydown, goal-style like savings) ----------
+
+function subDebtBudgeted(subcatId: string): number {
+    const c = col.value;
+    return getTargetAmount(subcatId, 'debt', c.year, c.month);
+}
+
+function subDebtActual(subcatId: string): number {
+    const c = col.value;
+    return getSectionActual(subcatId, 'debt', c.year, c.month);
+}
+
+function subDebtRemaining(subcatId: string): number {
+    return subDebtBudgeted(subcatId) - subDebtActual(subcatId);
+}
+
+function parentDebtBudgeted(parent: TransactionCategory): number {
+    return (parent.subCategories ?? []).reduce((sum, sub) => sum + subDebtBudgeted(sub.id), 0);
+}
+
+function parentDebtActual(parent: TransactionCategory): number {
+    return (parent.subCategories ?? []).reduce((sum, sub) => sum + subDebtActual(sub.id), 0);
+}
+
+function parentDebtRemaining(parent: TransactionCategory): number {
+    return parentDebtBudgeted(parent) - parentDebtActual(parent);
+}
+
+function isDebtSubVisible(subId: string): boolean {
+    return !hiddenCategoryIds.value.has(subId) || subDebtBudgeted(subId) > 0 || subDebtActual(subId) !== 0;
+}
+
+function isDebtParentVisible(parent: TransactionCategory): boolean {
+    if (!hiddenCategoryIds.value.has(parent.id)) return true;
+    return (parent.subCategories ?? []).some(sub => subDebtBudgeted(sub.id) > 0 || subDebtActual(sub.id) !== 0);
 }
 
 // ---------- Summary totals ----------
@@ -811,9 +1104,11 @@ const colExpenseDiff = computed<number>(() => colExpenseBudgeted.value - colExpe
 
 const colIncomeBudgeted = computed<number>(() =>
     allIncomeParents.value.flatMap(p => p.subCategories ?? []).reduce((s, sub) => s + subBudgeted(sub.id), 0)
+    + withdrawalItems.value.reduce((s, w) => s + subWithdrawalBudgeted(w.id), 0)
 );
 const colIncomeActual = computed<number>(() =>
     allIncomeParents.value.flatMap(p => p.subCategories ?? []).reduce((s, sub) => s + subActual(sub.id), 0)
+    + withdrawalTotal.value
 );
 const colIncomeDiff = computed<number>(() => colIncomeActual.value - colIncomeBudgeted.value);
 
@@ -825,8 +1120,16 @@ const colSavingsActual = computed<number>(() =>
 );
 const colSavingsDiff = computed<number>(() => colSavingsBudgeted.value - colSavingsActual.value);
 
-const colNetBudgeted = computed<number>(() => colIncomeBudgeted.value - colExpenseBudgeted.value - colSavingsBudgeted.value);
-const colNetActual = computed<number>(() => colIncomeActual.value - colExpenseActual.value - colSavingsActual.value);
+const colDebtBudgeted = computed<number>(() =>
+    allDebtParents.value.flatMap(p => p.subCategories ?? []).reduce((s, sub) => s + subDebtBudgeted(sub.id), 0)
+);
+const colDebtActual = computed<number>(() =>
+    allDebtParents.value.flatMap(p => p.subCategories ?? []).reduce((s, sub) => s + subDebtActual(sub.id), 0)
+);
+const colDebtDiff = computed<number>(() => colDebtBudgeted.value - colDebtActual.value);
+
+const colNetBudgeted = computed<number>(() => colIncomeBudgeted.value - colExpenseBudgeted.value - colSavingsBudgeted.value - colDebtBudgeted.value);
+const colNetActual = computed<number>(() => colIncomeActual.value - colExpenseActual.value - colSavingsActual.value - colDebtActual.value);
 const colNetDiff = computed<number>(() => colNetActual.value - colNetBudgeted.value);
 
 // ---------- Expand/collapse ----------
@@ -858,24 +1161,32 @@ function onAddSub(subId: string): void {
     showAddSheet.value = false;
 }
 
+function onAddWithdrawal(subId: string): void {
+    addWithdrawalCategory(subId);
+    showAddSheet.value = false;
+}
+
 // ---------- Inline edit via number pad ----------
 
-function startEdit(subcatId: string, subName: string): void {
+function startEdit(subcatId: string, subName: string, section?: BudgetSection): void {
+    const resolved = section ?? sectionForCategory(subcatId);
     editingSubId.value = subcatId;
+    editingSubSection.value = resolved;
     editingSubName.value = subName;
-    editingAmount.value = subBudgeted(subcatId);
+    editingAmount.value = getTargetAmount(subcatId, resolved, col.value.year, col.value.month);
     showNumPad.value = true;
 }
 
 watch(showNumPad, async (isOpen) => {
     if (isOpen || !editingSubId.value) return;
     const subId = editingSubId.value;
+    const section = editingSubSection.value;
     const amount = editingAmount.value;
     editingSubId.value = '';
     if (saving.value) return;
     saving.value = true;
     try {
-        await saveBudgetTarget(subId, col.value.year, col.value.month, amount);
+        await saveBudgetTarget(subId, section, col.value.year, col.value.month, amount);
     } catch (error: unknown) {
         if (!((error as { processed?: boolean }).processed)) {
             showToast((error as Error).message || String(error));
@@ -887,12 +1198,21 @@ watch(showNumPad, async (isOpen) => {
 
 // ---------- Data loading ----------
 
+async function loadLiabilityReserves(year: number, month: number): Promise<void> {
+    const resp = await axios.get<ApiResponse<{ items: LiabilityReserve[] }>>(
+        'v1/budget/liabilities.json',
+        { params: { startTime: cycleFirstUnixTime(year, month), endTime: cycleLastUnixTime(year, month) } }
+    );
+    liabilityReserves.value = resp.data?.result?.items ?? [];
+}
+
 async function loadCurrentMonthData(): Promise<void> {
     const { year, month } = col.value;
     const key = `${year}-${month}`;
     const tasks: Promise<void>[] = [];
     if (!budgetTargets.value[key]) tasks.push(loadBudgetTargets(year, month));
     if (!budgetActuals.value[key]) tasks.push(loadBudgetActuals(year, month));
+    tasks.push(loadLiabilityReserves(year, month));
     await Promise.all(tasks);
 }
 
@@ -911,6 +1231,7 @@ async function init(): Promise<void> {
             ...allExpenseParents.value.map(p => p.id),
             ...allIncomeParents.value.map(p => p.id),
             ...allTransferParents.value.map(p => p.id),
+            ...allDebtParents.value.map(p => p.id),
         ]);
         await loadCurrentMonthData();
     } catch (error: unknown) {
@@ -970,18 +1291,21 @@ async function advanceCopyStep(): Promise<void> {
         const destTargets = budgetTargets.value[destKey] ?? {};
 
         const items: CopyItem[] = [];
-        for (const [subcatId, entry] of Object.entries(sourceTargets)) {
+        // Target keys are `${categoryId}|${section}` so one category can appear once per section
+        for (const [entryKey, entry] of Object.entries(sourceTargets)) {
+            const [subcatId, section] = entryKey.split('|') as [string, BudgetSection];
             const subCat = categoriesStore.allTransactionCategoriesMap[subcatId];
             if (!subCat || !subCat.parentId || subCat.parentId === '0') continue;
             const parentCat = categoriesStore.allTransactionCategoriesMap[subCat.parentId];
             if (!parentCat) continue;
 
             const isHidden = hiddenCategoryIds.value.has(subcatId) || hiddenCategoryIds.value.has(parentCat.id);
-            const hasExistingTarget = !!destTargets[subcatId];
-            const existingAmount = destTargets[subcatId]?.amount ?? 0;
+            const hasExistingTarget = !!destTargets[entryKey];
+            const existingAmount = destTargets[entryKey]?.amount ?? 0;
 
             items.push({
                 subcategoryId: subcatId,
+                section,
                 subcategoryName: subCat.name,
                 parentCategoryId: parentCat.id,
                 parentCategoryName: parentCat.name,
@@ -997,6 +1321,7 @@ async function advanceCopyStep(): Promise<void> {
         if (items.every(i => !i.isHidden && !i.hasExistingTarget)) {
             const decisions: CopyDecision[] = items.map(i => ({
                 subcategoryId: i.subcategoryId,
+                section: i.section,
                 parentCategoryId: i.parentCategoryId,
                 amount: i.amount,
                 action: i.action,
@@ -1021,6 +1346,7 @@ async function executeCopy(): Promise<void> {
     try {
         const decisions: CopyDecision[] = copyItems.value.map(i => ({
             subcategoryId: i.subcategoryId,
+            section: i.section,
             parentCategoryId: i.parentCategoryId,
             amount: i.amount,
             action: i.action,
@@ -1179,6 +1505,14 @@ function onPageAfterIn(): void {
     opacity: 0.45;
 }
 
+.budget-m-section-hint {
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    margin-inline-start: 6px;
+    font-style: italic;
+}
+
 .budget-m-section-divider {
     height: 1px;
     background-color: var(--f7-list-border-color);
@@ -1244,5 +1578,45 @@ function onPageAfterIn(): void {
     text-align: center;
     opacity: 0.5;
     font-size: 0.875rem;
+}
+
+.budget-m-reserve-header {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.budget-m-reserve-row {
+    padding: 8px 16px;
+    border-top: 1px solid var(--f7-list-border-color);
+}
+
+.budget-m-reserve-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.budget-m-reserve-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.budget-m-reserve-owed {
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    padding-inline-start: 8px;
+}
+
+.budget-m-reserve-sub {
+    display: flex;
+    gap: 16px;
+    margin-top: 2px;
+    font-size: 0.72rem;
+    opacity: 0.6;
+    font-variant-numeric: tabular-nums;
 }
 </style>

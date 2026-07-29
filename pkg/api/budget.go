@@ -41,6 +41,25 @@ func (a *BudgetApi) BudgetActualsHandler(c *core.WebContext) (any, *errs.Error) 
 	return &models.BudgetActualsResponse{Items: items}, nil
 }
 
+// BudgetLiabilitiesHandler returns the debt/reserve view per liability account for the given time range
+func (a *BudgetApi) BudgetLiabilitiesHandler(c *core.WebContext) (any, *errs.Error) {
+	var req models.BudgetLiabilitiesGetRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Warnf(c, "[budget.BudgetLiabilitiesHandler] parse request failed, because %s", err.Error())
+		return nil, errs.NewIncompleteOrIncorrectSubmissionError(err)
+	}
+
+	uid := c.GetCurrentUid()
+	items, err := a.budgetTargets.GetLiabilityReserves(c, uid, req.StartTime, req.EndTime)
+
+	if err != nil {
+		log.Errorf(c, "[budget.BudgetLiabilitiesHandler] failed to get liability reserves for user \"uid:%d\", because %s", uid, err.Error())
+		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+
+	return &models.BudgetLiabilitiesResponse{Items: items}, nil
+}
+
 // BudgetTargetsHandler returns budget targets for the given year and month
 func (a *BudgetApi) BudgetTargetsHandler(c *core.WebContext) (any, *errs.Error) {
 	var req models.BudgetTargetsGetRequest
