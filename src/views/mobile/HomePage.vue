@@ -183,9 +183,10 @@
                 <f7-icon f7="chart_pie"></f7-icon>
                 <span class="tabbar-label">{{ tt('Statistics') }}</span>
             </f7-link>
-            <f7-link class="link" href="/goals">
-                <f7-icon f7="flag_2"></f7-icon>
-                <span class="tabbar-label">{{ tt('Goals') }}</span>
+            <f7-link id="homepage-financial-control-button" class="link"
+                     href="#" @click="showFinancialControlPopover = true">
+                <f7-icon f7="square_grid_2x2"></f7-icon>
+                <span class="tabbar-label">{{ tt('Control') }}</span>
             </f7-link>
             <f7-link class="link" href="/settings">
                 <f7-icon f7="gear_alt"></f7-icon>
@@ -222,6 +223,28 @@
             </f7-list>
         </f7-popover>
 
+        <!-- Financial control entries; add future pages (e.g. reports) as further list items here -->
+        <f7-popover class="financial-control-popover-menu" target-el="#homepage-financial-control-button"
+                    v-model:opened="showFinancialControlPopover">
+            <f7-list dividers>
+                <f7-list-item popover-close link="/budget" :title="tt('Budget')">
+                    <template #media>
+                        <f7-icon f7="creditcard_fill"></f7-icon>
+                    </template>
+                </f7-list-item>
+                <f7-list-item popover-close link="/goals" :title="tt('Goals')">
+                    <template #media>
+                        <f7-icon f7="flag_2"></f7-icon>
+                    </template>
+                </f7-list-item>
+                <f7-list-item popover-close link="/subscriptions" :title="tt('Subscriptions')">
+                    <template #media>
+                        <f7-icon f7="arrow_2_squarepath"></f7-icon>
+                    </template>
+                </f7-list-item>
+            </f7-list>
+        </f7-popover>
+
         <a-i-image-recognition-sheet ref="aiImageRecognitionSheet"
                                      v-model:show="showAIReceiptImageRecognitionSheet"
                                      @recognition:change="onReceiptRecognitionChanged"/>
@@ -252,7 +275,6 @@ import { CategoryType } from '@/core/category.ts';
 import { TemplateType } from '@/core/template.ts';
 import { TransactionTemplate } from '@/models/transaction_template.ts';
 import type { ApiResponse } from '@/core/api.ts';
-import services from '@/lib/services.ts';
 
 import { isFunction } from '@/lib/common.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
@@ -294,6 +316,7 @@ const aiImageRecognitionSheet = useTemplateRef<AIImageRecognitionSheetType>('aiI
 const loading = ref<boolean>(true);
 const loadingBudget = ref<boolean>(true);
 const showTransactionTemplatePopover = ref<boolean>(false);
+const showFinancialControlPopover = ref<boolean>(false);
 const showAIReceiptImageRecognitionSheet = ref<boolean>(false);
 
 const budgetSummary = ref<BudgetSummaryItem[]>([]);
@@ -317,11 +340,10 @@ interface BudgetTargetRawItem {
     amount: string;
 }
 
-interface SavingsActualRawItem {
+interface BudgetActualRawItem {
     categoryId: string;
-    transferOut: string;
-    transferIn: string;
-    net: string;
+    section: string;
+    amount: number;
 }
 
 async function loadBudgetOverview(): Promise<void> {
@@ -352,27 +374,33 @@ async function loadBudgetOverview(): Promise<void> {
     cycleYear.value = year;
     cycleMonth.value = month;
 
-    const [budgetResp, statsResp, savingsResp] = await Promise.all([
+    const [budgetResp, actualsResp] = await Promise.all([
         axios.get<ApiResponse<BudgetTargetRawItem[]>>(`v1/budget/targets.json?year=${year}&month=${month}`),
-        services.getTransactionStatistics({ startTime, endTime, tagFilter: '', keyword: '', useTransactionTimezone: false, matchMode: 0 }),
-        axios.get<ApiResponse<{ items: SavingsActualRawItem[] }>>(`v1/budget/savings-actuals.json?year=${year}&month=${month}`)
+        axios.get<ApiResponse<{ items: BudgetActualRawItem[] }>>('v1/budget/actuals.json', { params: { startTime, endTime } })
     ]);
 
     const targets = budgetResp.data?.result ?? [];
-    const statsItems = statsResp.data?.result?.items ?? [];
-    const savingsItems = savingsResp.data?.result?.items ?? [];
+    const actualItems = actualsResp.data?.result?.items ?? [];
 
-    const spentBySubcategoryId: Record<string, number> = {};
-    for (const item of statsItems) {
-        const cat = transactionCategoriesStore.allTransactionCategoriesMap[item.categoryId];
-        if (cat && cat.type === CategoryType.Expense) {
-            spentBySubcategoryId[item.categoryId] = (spentBySubcategoryId[item.categoryId] ?? 0) + item.amount;
-        }
+    // Per-category amounts split by section (the backend already excludes budget-excluded transactions)
+    const sectionByCat: Record<string, Partial<Record<string, number>>> = {};
+    for (const item of actualItems) {
+        const entry = sectionByCat[item.categoryId] ?? (sectionByCat[item.categoryId] = {});
+        entry[item.section] = (entry[item.section] ?? 0) + item.amount;
     }
 
+    const spentBySubcategoryId: Record<string, number> = {};
     const savingsNetBySubId: Record<string, number> = {};
-    for (const item of savingsItems) {
-        savingsNetBySubId[item.categoryId] = Number(item.net);
+    for (const [catId, sections] of Object.entries(sectionByCat)) {
+        if (sections['expense']) {
+            spentBySubcategoryId[catId] = sections['expense'];
+        }
+        // Gross set-aside: savings contributions plus card/debt paydowns. Withdrawals are not
+        // netted off — they are income, and the overview card tracks progress toward targets.
+        const setAside = (sections['savings'] ?? 0) + (sections['debt'] ?? 0);
+        if (setAside !== 0) {
+            savingsNetBySubId[catId] = setAside;
+        }
     }
 
     const budgetedSubcategoryIds = new Set<string>();

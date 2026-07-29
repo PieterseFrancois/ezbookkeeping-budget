@@ -4,6 +4,9 @@
             <f7-nav-left :back-link="tt('Back')"></f7-nav-left>
             <f7-nav-title>{{ tt('Goals') }}</f7-nav-title>
             <f7-nav-right>
+                <f7-link @click="showAmountInGoalsPage = !showAmountInGoalsPage">
+                    <f7-icon class="ebk-hide-icon" :f7="showAmountInGoalsPage ? 'eye_slash_fill' : 'eye_fill'"></f7-icon>
+                </f7-link>
                 <f7-link icon-f7="plus" @click="openAddPopup" />
             </f7-nav-right>
         </f7-navbar>
@@ -178,9 +181,11 @@ import { useI18n } from '@/locales/helpers.ts';
 import { useI18nUIComponents } from '@/lib/ui/mobile.ts';
 import { useAccountsStore } from '@/stores/account.ts';
 import { useUserStore } from '@/stores/user.ts';
+import { useSettingsStore } from '@/stores/setting.ts';
 import { parseDateTimeFromUnixTime } from '@/lib/datetime.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 import type { ApiResponse } from '@/core/api.ts';
+import { DISPLAY_HIDDEN_AMOUNT } from '@/consts/numeral.ts';
 
 const {
     tt,
@@ -193,7 +198,13 @@ const { showToast } = useI18nUIComponents();
 
 const accountsStore = useAccountsStore();
 const userStore = useUserStore();
+const settingsStore = useSettingsStore();
 const defaultCurrency = computed<string>(() => userStore.currentUserDefaultCurrency);
+
+const showAmountInGoalsPage = computed<boolean>({
+    get: () => settingsStore.appSettings.showAmountInGoalsPage,
+    set: (value) => settingsStore.setShowAmountInGoalsPage(value)
+});
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -280,6 +291,9 @@ const monthOptions = computed(() =>
 );
 
 function fmtAmount(cents: number): string {
+    if (!showAmountInGoalsPage.value) {
+        return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value);
+    }
     return formatAmountToLocalizedNumeralsWithCurrency(cents, defaultCurrency.value)
         .replace(/[,.]00$/, '');
 }
@@ -287,6 +301,9 @@ function fmtAmount(cents: number): string {
 function fmtBalance(goal: Goal): string {
     const bal = accountBalance(goal.accountId);
     const cur = accountCurrency(goal.accountId);
+    if (!showAmountInGoalsPage.value) {
+        return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, cur);
+    }
     return formatAmountToLocalizedNumeralsWithCurrency(bal, cur).replace(/[,.]00$/, '');
 }
 

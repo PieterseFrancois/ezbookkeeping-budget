@@ -7,6 +7,7 @@ import (
 	"github.com/mayswind/ezbookkeeping/pkg/datastore"
 	"github.com/mayswind/ezbookkeeping/pkg/log"
 	"github.com/mayswind/ezbookkeeping/pkg/models"
+	"github.com/mayswind/ezbookkeeping/pkg/services"
 )
 
 // Database represents the database command
@@ -196,6 +197,26 @@ func updateAllDatabaseTablesStructure(c *core.CliContext) error {
 	}
 
 	log.BootInfof(c, "[database.updateAllDatabaseTablesStructure] goal table maintained successfully")
+
+	err = datastore.Container.UserDataStore.SyncStructs(new(models.Subscription))
+
+	if err != nil {
+		return err
+	}
+
+	log.BootInfof(c, "[database.updateAllDatabaseTablesStructure] subscription table maintained successfully")
+
+	// Data migration: budget targets created before sections existed have an empty section.
+	// This is guarded on section='' so it is idempotent and a no-op on every subsequent start.
+	backfilled, err := services.BudgetTargets.BackfillBudgetTargetSections(c)
+
+	if err != nil {
+		return err
+	}
+
+	if backfilled > 0 {
+		log.BootInfof(c, "[database.updateAllDatabaseTablesStructure] backfilled section on %d budget target(s)", backfilled)
+	}
 
 	return nil
 }

@@ -10,83 +10,54 @@ import (
 
 // BudgetApi represents budget api
 type BudgetApi struct {
-	budgetTargets            *services.BudgetService
-	transactionCategories    *services.TransactionCategoryService
+	budgetTargets              *services.BudgetService
 	transactionBudgetOverrides *services.TransactionBudgetOverrideService
-	users                    *services.UserService
 }
 
 // Initialize a budget api singleton instance
 var (
 	Budget = &BudgetApi{
 		budgetTargets:              services.BudgetTargets,
-		transactionCategories:      services.TransactionCategories,
 		transactionBudgetOverrides: services.TransactionBudgetOverrides,
-		users:                      services.Users,
 	}
 )
 
-// SavingsActualsHandler returns actual transfer amounts per transfer subcategory for the given year and month
-func (a *BudgetApi) SavingsActualsHandler(c *core.WebContext) (any, *errs.Error) {
-	var req models.SavingsActualGetRequest
-	err := c.ShouldBindQuery(&req)
-
-	if err != nil {
-		log.Warnf(c, "[budget.SavingsActualsHandler] parse request failed, because %s", err.Error())
+// BudgetActualsHandler returns unified budget actuals (per category, per section) for the given time range
+func (a *BudgetApi) BudgetActualsHandler(c *core.WebContext) (any, *errs.Error) {
+	var req models.BudgetActualsGetRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Warnf(c, "[budget.BudgetActualsHandler] parse request failed, because %s", err.Error())
 		return nil, errs.NewIncompleteOrIncorrectSubmissionError(err)
 	}
 
 	uid := c.GetCurrentUid()
-
-	user, err := a.users.GetUserById(c, uid)
-
-	if err != nil {
-		log.Errorf(c, "[budget.SavingsActualsHandler] failed to get user \"uid:%d\", because %s", uid, err.Error())
-		return nil, errs.Or(err, errs.ErrUserNotFound)
-	}
-
-	allCategories, err := a.transactionCategories.GetAllCategoriesByUid(c, uid, models.CATEGORY_TYPE_TRANSFER, -1)
+	items, err := a.budgetTargets.GetBudgetActuals(c, uid, req.StartTime, req.EndTime)
 
 	if err != nil {
-		log.Errorf(c, "[budget.SavingsActualsHandler] failed to get transaction categories for user \"uid:%d\", because %s", uid, err.Error())
+		log.Errorf(c, "[budget.BudgetActualsHandler] failed to get budget actuals for user \"uid:%d\", because %s", uid, err.Error())
 		return nil, errs.Or(err, errs.ErrOperationFailed)
 	}
 
-	categoryIds := make([]int64, 0, len(allCategories))
-
-	for _, cat := range allCategories {
-		if cat.ParentCategoryId != models.LevelOneTransactionCategoryParentId {
-			categoryIds = append(categoryIds, cat.CategoryId)
-		}
-	}
-
-	items, err := a.budgetTargets.GetSavingsActuals(c, uid, req.Year, req.Month, int(user.BudgetEndDay), categoryIds)
-
-	if err != nil {
-		log.Errorf(c, "[budget.SavingsActualsHandler] failed to get savings actuals for user \"uid:%d\", because %s", uid, err.Error())
-		return nil, errs.Or(err, errs.ErrOperationFailed)
-	}
-
-	return &models.SavingsActualsResponse{Items: items}, nil
+	return &models.BudgetActualsResponse{Items: items}, nil
 }
 
-// ExpenseIncomeActualsHandler returns budget-filtered expense and income actuals for the given time range
-func (a *BudgetApi) ExpenseIncomeActualsHandler(c *core.WebContext) (any, *errs.Error) {
-	var req models.BudgetExpenseIncomeActualsGetRequest
+// BudgetLiabilitiesHandler returns the debt/reserve view per liability account for the given time range
+func (a *BudgetApi) BudgetLiabilitiesHandler(c *core.WebContext) (any, *errs.Error) {
+	var req models.BudgetLiabilitiesGetRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		log.Warnf(c, "[budget.ExpenseIncomeActualsHandler] parse request failed, because %s", err.Error())
+		log.Warnf(c, "[budget.BudgetLiabilitiesHandler] parse request failed, because %s", err.Error())
 		return nil, errs.NewIncompleteOrIncorrectSubmissionError(err)
 	}
 
 	uid := c.GetCurrentUid()
-	items, err := a.budgetTargets.GetExpenseIncomeActuals(c, uid, req.StartTime, req.EndTime)
+	items, err := a.budgetTargets.GetLiabilityReserves(c, uid, req.StartTime, req.EndTime)
 
 	if err != nil {
-		log.Errorf(c, "[budget.ExpenseIncomeActualsHandler] failed to get expense/income actuals for user \"uid:%d\", because %s", uid, err.Error())
+		log.Errorf(c, "[budget.BudgetLiabilitiesHandler] failed to get liability reserves for user \"uid:%d\", because %s", uid, err.Error())
 		return nil, errs.Or(err, errs.ErrOperationFailed)
 	}
 
-	return &models.BudgetExpenseIncomeActualsResponse{Items: items}, nil
+	return &models.BudgetLiabilitiesResponse{Items: items}, nil
 }
 
 // BudgetTargetsHandler returns budget targets for the given year and month

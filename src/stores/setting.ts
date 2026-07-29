@@ -235,6 +235,27 @@ export const useSettingsStore = defineStore('settings', () => {
         updateUserApplicationCloudSettingValue('overviewTransactionCategoryFilterInHomePage', value);
     }
 
+    // Budget Page
+    function setShowAmountInBudgetPage(value: boolean): void {
+        updateApplicationSettingsValue('showAmountInBudgetPage', value);
+        appSettings.value.showAmountInBudgetPage = value;
+        updateUserApplicationCloudSettingValue('showAmountInBudgetPage', value);
+    }
+
+    // Goals Page
+    function setShowAmountInGoalsPage(value: boolean): void {
+        updateApplicationSettingsValue('showAmountInGoalsPage', value);
+        appSettings.value.showAmountInGoalsPage = value;
+        updateUserApplicationCloudSettingValue('showAmountInGoalsPage', value);
+    }
+
+    // Subscriptions Page
+    function setShowAmountInSubscriptionsPage(value: boolean): void {
+        updateApplicationSettingsValue('showAmountInSubscriptionsPage', value);
+        appSettings.value.showAmountInSubscriptionsPage = value;
+        updateUserApplicationCloudSettingValue('showAmountInSubscriptionsPage', value);
+    }
+
     // Transaction List Page
     function setItemsCountInTransactionListPage(value: number): void {
         updateApplicationSettingsValue('itemsCountInTransactionListPage', value);
@@ -606,6 +627,12 @@ export const useSettingsStore = defineStore('settings', () => {
         setTimezoneUsedForStatisticsInHomePage,
         setOverviewAccountFilterInHomePage,
         setOverviewTransactionCategoryFilterInHomePage,
+        // -- Budget Page
+        setShowAmountInBudgetPage,
+        // -- Goals Page
+        setShowAmountInGoalsPage,
+        // -- Subscriptions Page
+        setShowAmountInSubscriptionsPage,
         // -- Transaction List Page
         setItemsCountInTransactionListPage,
         setShowTotalAmountInTransactionListPage,

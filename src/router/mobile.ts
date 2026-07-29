@@ -52,6 +52,7 @@ import TemplateListPage from '@/views/mobile/templates/ListPage.vue';
 
 import BudgetPage from '@/views/mobile/budget/BudgetPage.vue';
 import GoalsPage from '@/views/mobile/goals/GoalsPage.vue';
+import SubscriptionsPage from '@/views/mobile/subscriptions/SubscriptionsPage.vue';
 
 function asyncResolve(component: unknown): (ctx: Router.RouteCallbackCtx) => void {
     return function({ resolve }: { resolve: ({ component }: { component: unknown }) => void }): void {
@@ -353,6 +354,11 @@ const routes: Router.RouteParameters[] = [
     {
         path: '/goals',
         async: asyncResolve(GoalsPage),
+        beforeEnter: [checkLogin]
+    },
+    {
+        path: '/subscriptions',
+        async: asyncResolve(SubscriptionsPage),
         beforeEnter: [checkLogin]
     },
     {

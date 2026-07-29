@@ -4,6 +4,15 @@
         <v-col cols="12" class="d-flex align-center pb-2">
             <h5 class="text-h5">{{ tt('Goals') }}</h5>
             <v-spacer />
+            <v-btn
+                class="me-2 px-2"
+                min-width="0"
+                variant="tonal"
+                @click="showAmountInGoalsPage = !showAmountInGoalsPage"
+            >
+                <v-icon :icon="showAmountInGoalsPage ? mdiEyeOffOutline : mdiEyeOutline" size="20" />
+                <v-tooltip activator="parent">{{ showAmountInGoalsPage ? tt('Hide Amount') : tt('Show Amount') }}</v-tooltip>
+            </v-btn>
             <v-btn :prepend-icon="mdiPlus" variant="tonal" @click="openAddDialog">
                 {{ tt('Add Goal') }}
             </v-btn>
@@ -184,14 +193,18 @@ import axios from 'axios';
 import { useI18n } from '@/locales/helpers.ts';
 import { useAccountsStore } from '@/stores/account.ts';
 import { useUserStore } from '@/stores/user.ts';
+import { useSettingsStore } from '@/stores/setting.ts';
 import { parseDateTimeFromUnixTime } from '@/lib/datetime.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 import type { ApiResponse } from '@/core/api.ts';
+import { DISPLAY_HIDDEN_AMOUNT } from '@/consts/numeral.ts';
 
 import {
     mdiPlus,
     mdiPencilOutline,
     mdiTrashCanOutline,
+    mdiEyeOutline,
+    mdiEyeOffOutline,
 } from '@mdi/js';
 
 type SnackBarType = InstanceType<typeof SnackBar>;
@@ -205,7 +218,13 @@ const {
 
 const accountsStore = useAccountsStore();
 const userStore = useUserStore();
+const settingsStore = useSettingsStore();
 const defaultCurrency = computed<string>(() => userStore.currentUserDefaultCurrency);
+
+const showAmountInGoalsPage = computed<boolean>({
+    get: () => settingsStore.appSettings.showAmountInGoalsPage,
+    set: (value) => settingsStore.setShowAmountInGoalsPage(value)
+});
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -293,6 +312,9 @@ const monthOptions = computed(() =>
 );
 
 function fmtAmount(cents: number): string {
+    if (!showAmountInGoalsPage.value) {
+        return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value);
+    }
     return formatAmountToLocalizedNumeralsWithCurrency(cents, defaultCurrency.value)
         .replace(/[,.]00$/, '');
 }
@@ -300,6 +322,9 @@ function fmtAmount(cents: number): string {
 function fmtBalance(goal: Goal): string {
     const bal = accountBalance(goal.accountId);
     const cur = accountCurrency(goal.accountId);
+    if (!showAmountInGoalsPage.value) {
+        return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, cur);
+    }
     return formatAmountToLocalizedNumeralsWithCurrency(bal, cur).replace(/[,.]00$/, '');
 }
 

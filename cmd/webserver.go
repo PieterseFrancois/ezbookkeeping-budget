@@ -126,6 +126,7 @@ func startWebServer(c *core.CliContext) error {
 		_ = v.RegisterValidation("validTagFilter", validators.ValidTagFilter)
 		_ = v.RegisterValidation("validFiscalYearStart", validators.ValidateFiscalYearStart)
 		_ = v.RegisterValidation("validBudgetEndDay", validators.ValidateBudgetEndDay)
+		_ = v.RegisterValidation("validBudgetSection", validators.ValidateBudgetSection)
 	}
 
 	router.NoRoute(bindApi(api.Default.ApiNotFound, config))
@@ -478,8 +479,8 @@ func startWebServer(c *core.CliContext) error {
 			apiV1Route.POST("/budget/targets/add.json", bindApi(api.Budget.CreateBudgetTargetHandler, config))
 			apiV1Route.POST("/budget/targets/modify.json", bindApi(api.Budget.UpdateBudgetTargetHandler, config))
 			apiV1Route.POST("/budget/targets/delete.json", bindApi(api.Budget.DeleteBudgetTargetHandler, config))
-			apiV1Route.GET("/budget/savings-actuals.json", bindApi(api.Budget.SavingsActualsHandler, config))
-			apiV1Route.GET("/budget/expense-income-actuals.json", bindApi(api.Budget.ExpenseIncomeActualsHandler, config))
+			apiV1Route.GET("/budget/actuals.json", bindApi(api.Budget.BudgetActualsHandler, config))
+			apiV1Route.GET("/budget/liabilities.json", bindApi(api.Budget.BudgetLiabilitiesHandler, config))
 			apiV1Route.POST("/budget/transaction/override/set.json", bindApi(api.Budget.SetTransactionBudgetOverrideHandler, config))
 
 			// Goals
@@ -487,6 +488,13 @@ func startWebServer(c *core.CliContext) error {
 			apiV1Route.POST("/goals/add.json", bindApi(api.Goal.CreateGoalHandler, config))
 			apiV1Route.POST("/goals/modify.json", bindApi(api.Goal.UpdateGoalHandler, config))
 			apiV1Route.POST("/goals/delete.json", bindApi(api.Goal.DeleteGoalHandler, config))
+
+			// Subscriptions
+			apiV1Route.GET("/subscriptions/list.json", bindApi(api.Subscription.SubscriptionsHandler, config))
+			apiV1Route.POST("/subscriptions/add.json", bindApi(api.Subscription.CreateSubscriptionHandler, config))
+			apiV1Route.POST("/subscriptions/modify.json", bindApi(api.Subscription.UpdateSubscriptionHandler, config))
+			apiV1Route.POST("/subscriptions/toggle.json", bindApi(api.Subscription.ToggleSubscriptionActiveHandler, config))
+			apiV1Route.POST("/subscriptions/delete.json", bindApi(api.Subscription.DeleteSubscriptionHandler, config))
 
 			// Large Language Models
 			if config.TextRecognitionLLMConfig != nil && config.TextRecognitionLLMConfig.LLMProvider != "" {

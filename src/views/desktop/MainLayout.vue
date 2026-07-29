@@ -21,18 +21,6 @@
                         <span class="nav-item-title">{{ tt('Overview') }}</span>
                     </router-link>
                 </li>
-                <li class="nav-link">
-                    <router-link to="/budget">
-                        <v-icon class="nav-item-icon" :icon="mdiWalletOutline"/>
-                        <span class="nav-item-title">{{ tt('Budget') }}</span>
-                    </router-link>
-                </li>
-                <li class="nav-link">
-                    <router-link to="/goals">
-                        <v-icon class="nav-item-icon" :icon="mdiFlagCheckered"/>
-                        <span class="nav-item-title">{{ tt('Goals') }}</span>
-                    </router-link>
-                </li>
                 <li class="nav-section-title">
                     <div class="title-wrapper">
                         <span class="title-text">{{ tt('Transaction Data') }}</span>
@@ -95,6 +83,29 @@
                     <router-link to="/schedule/list">
                         <v-icon class="nav-item-icon" :icon="mdiClipboardTextClockOutline"/>
                         <span class="nav-item-title">{{ tt('Scheduled Transactions') }}</span>
+                    </router-link>
+                </li>
+                <li class="nav-section-title">
+                    <div class="title-wrapper">
+                        <span class="title-text">{{ tt('Financial Control') }}</span>
+                    </div>
+                </li>
+                <li class="nav-link">
+                    <router-link to="/budget">
+                        <v-icon class="nav-item-icon" :icon="mdiWalletOutline"/>
+                        <span class="nav-item-title">{{ tt('Budget') }}</span>
+                    </router-link>
+                </li>
+                <li class="nav-link">
+                    <router-link to="/goals">
+                        <v-icon class="nav-item-icon" :icon="mdiFlagCheckered"/>
+                        <span class="nav-item-title">{{ tt('Goals') }}</span>
+                    </router-link>
+                </li>
+                <li class="nav-link">
+                    <router-link to="/subscriptions">
+                        <v-icon class="nav-item-icon" :icon="mdiCreditCardSync"/>
+                        <span class="nav-item-title">{{ tt('Subscriptions') }}</span>
                     </router-link>
                 </li>
                 <li class="nav-section-title">
@@ -243,6 +254,7 @@ import {
     mdiHomeOutline,
     mdiWalletOutline,
     mdiFlagCheckered,
+    mdiCreditCardSync,
     mdiListBoxOutline,
     mdiPlusCircle,
     mdiCreditCardOutline,
