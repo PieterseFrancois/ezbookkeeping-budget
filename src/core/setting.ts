@@ -52,6 +52,12 @@ export interface ApplicationSettings extends BaseApplicationSetting {
     timezoneUsedForStatisticsInHomePage: number;
     overviewAccountFilterInHomePage: Record<string, boolean>;
     overviewTransactionCategoryFilterInHomePage: Record<string, boolean>;
+    // Budget Page
+    showAmountInBudgetPage: boolean;
+    // Goals Page
+    showAmountInGoalsPage: boolean;
+    // Subscriptions Page
+    showAmountInSubscriptionsPage: boolean;
     // Transaction List Page
     quickSaveButtonStyleInMobileTransactionListPage: number;
     quickAddButtonActionInMobileTransactionEditPage: number;
@@ -141,6 +147,12 @@ export const ALL_ALLOWED_CLOUD_SYNC_APP_SETTING_KEY_TYPES: Record<string, UserAp
     'timezoneUsedForStatisticsInHomePage': UserApplicationCloudSettingType.Number,
     'overviewAccountFilterInHomePage': UserApplicationCloudSettingType.StringBooleanMap,
     'overviewTransactionCategoryFilterInHomePage': UserApplicationCloudSettingType.StringBooleanMap,
+    // Budget Page
+    'showAmountInBudgetPage': UserApplicationCloudSettingType.Boolean,
+    // Goals Page
+    'showAmountInGoalsPage': UserApplicationCloudSettingType.Boolean,
+    // Subscriptions Page
+    'showAmountInSubscriptionsPage': UserApplicationCloudSettingType.Boolean,
     // Transaction List Page
     'itemsCountInTransactionListPage': UserApplicationCloudSettingType.Number,
     'showTotalAmountInTransactionListPage': UserApplicationCloudSettingType.Boolean,
@@ -212,6 +224,12 @@ export const DEFAULT_APPLICATION_SETTINGS: ApplicationSettings = {
     timezoneUsedForStatisticsInHomePage: TimezoneTypeForStatistics.Default.type,
     overviewAccountFilterInHomePage: {},
     overviewTransactionCategoryFilterInHomePage: {},
+    // Budget Page
+    showAmountInBudgetPage: true,
+    // Goals Page
+    showAmountInGoalsPage: true,
+    // Subscriptions Page
+    showAmountInSubscriptionsPage: true,
     // Transaction List Page
     itemsCountInTransactionListPage: 15,
     showTotalAmountInTransactionListPage: true,

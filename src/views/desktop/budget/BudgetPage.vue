@@ -13,6 +13,15 @@
                 <v-tooltip activator="parent">{{ tt('How Budgeting Works') }}</v-tooltip>
             </v-btn>
             <v-spacer />
+            <v-btn
+                class="me-2 px-2"
+                min-width="0"
+                variant="tonal"
+                @click="showAmountInBudgetPage = !showAmountInBudgetPage"
+            >
+                <v-icon :icon="showAmountInBudgetPage ? mdiEyeOffOutline : mdiEyeOutline" size="20" />
+                <v-tooltip activator="parent">{{ showAmountInBudgetPage ? tt('Hide Amount') : tt('Show Amount') }}</v-tooltip>
+            </v-btn>
             <v-btn :prepend-icon="mdiContentCopy" variant="tonal" @click="openCopyDialog">
                 {{ tt('Copy Budget') }}
             </v-btn>
@@ -781,11 +790,14 @@ import { parseDateTimeFromUnixTime } from '@/lib/datetime.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 import axios from 'axios';
 import type { ApiResponse } from '@/core/api.ts';
+import { DISPLAY_HIDDEN_AMOUNT } from '@/consts/numeral.ts';
 
 import {
     mdiChevronDown,
     mdiChevronRight,
     mdiEyeOff,
+    mdiEyeOutline,
+    mdiEyeOffOutline,
     mdiPlus,
     mdiContentCopy,
     mdiHelpCircleOutline,
@@ -820,6 +832,7 @@ const {
 } = useI18n();
 
 const {
+    showAmountInBudgetPage,
     selectedYear,
     selectedMonth,
     hiddenCategoryIds,
@@ -1060,12 +1073,18 @@ function isSelectedMonth(m: { year: number; month: number }): boolean {
 }
 
 function fmt(amount: number): string {
+    if (!showAmountInBudgetPage.value) {
+        return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value);
+    }
     const rands = Math.round(amount / 100) * 100;
     return formatAmountToLocalizedNumeralsWithCurrency(rands, defaultCurrency.value)
         .replace(/[,.]00$/, '');
 }
 
 function fmtCurrency(amount: number, currency: string): string {
+    if (!showAmountInBudgetPage.value) {
+        return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, currency);
+    }
     return formatAmountToLocalizedNumeralsWithCurrency(amount, currency);
 }
 

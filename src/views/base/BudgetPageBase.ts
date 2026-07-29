@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import axios from 'axios';
 import type { ApiResponse } from '@/core/api.ts';
 import { useUserStore } from '@/stores/user.ts';
+import { useSettingsStore } from '@/stores/setting.ts';
 
 const HIDDEN_CATEGORIES_KEY = 'budget_hidden_categories';
 // Withdrawal rows are opt-in (the inverse of normal categories, which are opt-out), so they
@@ -83,6 +84,11 @@ export function addMonths(year: number, month: number, delta: number): { year: n
 export function useBudgetPageBase() {
     const now = new Date();
     const userStore = useUserStore();
+    const settingsStore = useSettingsStore();
+    const showAmountInBudgetPage = computed<boolean>({
+        get: () => settingsStore.appSettings.showAmountInBudgetPage,
+        set: (value) => settingsStore.setShowAmountInBudgetPage(value)
+    });
     const endDay = userStore.currentUserBudgetEndDay;
     const activeMonth = (endDay > 0 && now.getDate() > endDay)
         ? addMonths(now.getFullYear(), now.getMonth() + 1, 1)
@@ -298,6 +304,7 @@ export function useBudgetPageBase() {
     }
 
     return {
+        showAmountInBudgetPage,
         selectedYear,
         selectedMonth,
         hiddenCategoryIds,

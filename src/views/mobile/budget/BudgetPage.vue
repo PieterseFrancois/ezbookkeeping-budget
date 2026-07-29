@@ -5,6 +5,9 @@
             <f7-nav-title>{{ tt('Budget') }}</f7-nav-title>
             <f7-nav-right>
                 <f7-link icon-f7="question_circle" @click="showHelpPopup = true" />
+                <f7-link @click="showAmountInBudgetPage = !showAmountInBudgetPage">
+                    <f7-icon class="ebk-hide-icon" :f7="showAmountInBudgetPage ? 'eye_slash_fill' : 'eye_fill'"></f7-icon>
+                </f7-link>
                 <f7-link icon-f7="doc_on_doc" :class="{ disabled: loading }" @click="openCopyPopup" />
             </f7-nav-right>
         </f7-navbar>
@@ -633,6 +636,7 @@ import { parseDateTimeFromUnixTime } from '@/lib/datetime.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 import axios from 'axios';
 import type { ApiResponse } from '@/core/api.ts';
+import { DISPLAY_HIDDEN_AMOUNT } from '@/consts/numeral.ts';
 
 // Transfer parent categories that map to the Savings and Cards & Debt sections
 const SAVINGS_PARENT_NAME = 'Savings & Investments';
@@ -658,6 +662,7 @@ const {
 const { showToast } = useI18nUIComponents();
 
 const {
+    showAmountInBudgetPage,
     selectedYear,
     selectedMonth,
     hiddenCategoryIds,
@@ -902,12 +907,18 @@ function isSelectedMonth(m: { year: number; month: number }): boolean {
 }
 
 function fmt(amount: number): string {
+    if (!showAmountInBudgetPage.value) {
+        return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value);
+    }
     const rands = Math.round(amount / 100) * 100;
     return formatAmountToLocalizedNumeralsWithCurrency(rands, defaultCurrency.value)
         .replace(/[,.]00$/, '');
 }
 
 function fmtCurrency(amount: number, currency: string): string {
+    if (!showAmountInBudgetPage.value) {
+        return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, currency);
+    }
     return formatAmountToLocalizedNumeralsWithCurrency(amount, currency);
 }
 

@@ -4,6 +4,15 @@
         <v-col cols="12" class="d-flex align-center pb-2">
             <h5 class="text-h5">{{ tt('Subscriptions') }}</h5>
             <v-spacer />
+            <v-btn
+                class="me-2 px-2"
+                min-width="0"
+                variant="tonal"
+                @click="showAmountInSubscriptionsPage = !showAmountInSubscriptionsPage"
+            >
+                <v-icon :icon="showAmountInSubscriptionsPage ? mdiEyeOffOutline : mdiEyeOutline" size="20" />
+                <v-tooltip activator="parent">{{ showAmountInSubscriptionsPage ? tt('Hide Amount') : tt('Show Amount') }}</v-tooltip>
+            </v-btn>
             <v-btn :prepend-icon="mdiPlus" variant="tonal" @click="openAddDialog">
                 {{ tt('Add Subscription') }}
             </v-btn>
@@ -186,6 +195,7 @@ import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useTransactionTemplatesStore } from '@/stores/transactionTemplate.ts';
 import { useExchangeRatesStore } from '@/stores/exchangeRates.ts';
+import { useSettingsStore } from '@/stores/setting.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 import {
     parseDateTimeFromUnixTime,
@@ -198,6 +208,7 @@ import { TransactionEditPageType } from '@/views/base/transactions/TransactionEd
 import type { TransactionTemplate } from '@/models/transaction_template.ts';
 import type { TextualYearMonthDay } from '@/core/datetime.ts';
 import type { ApiResponse } from '@/core/api.ts';
+import { DISPLAY_HIDDEN_AMOUNT } from '@/consts/numeral.ts';
 
 import {
     mdiPlus,
@@ -206,6 +217,8 @@ import {
     mdiTrashCanOutline,
     mdiCheckCircle,
     mdiCloseCircle,
+    mdiEyeOutline,
+    mdiEyeOffOutline,
 } from '@mdi/js';
 
 type SnackBarType = InstanceType<typeof SnackBar>;
@@ -225,8 +238,14 @@ const accountsStore = useAccountsStore();
 const categoriesStore = useTransactionCategoriesStore();
 const templatesStore = useTransactionTemplatesStore();
 const exchangeRatesStore = useExchangeRatesStore();
+const settingsStore = useSettingsStore();
 
 const defaultCurrency = computed<string>(() => userStore.currentUserDefaultCurrency);
+
+const showAmountInSubscriptionsPage = computed<boolean>({
+    get: () => settingsStore.appSettings.showAmountInSubscriptionsPage,
+    set: (value) => settingsStore.setShowAmountInSubscriptionsPage(value)
+});
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -376,7 +395,9 @@ function accountCoverage(subscription: Subscription, template: TransactionTempla
     return {
         covered: account.balance >= neededInAccountCurrency,
         accountName: account.name,
-        accountBalanceDisplay: formatAmountToLocalizedNumeralsWithCurrency(account.balance, account.currency),
+        accountBalanceDisplay: showAmountInSubscriptionsPage.value
+            ? formatAmountToLocalizedNumeralsWithCurrency(account.balance, account.currency)
+            : formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, account.currency),
     };
 }
 
@@ -404,9 +425,13 @@ const tableItems = computed(() => subscriptions.value.map(subscription => {
         raw: subscription,
         id: subscription.id,
         name: subscription.name,
-        amountDisplay: formatAmountToLocalizedNumeralsWithCurrency(subscription.amount, subscription.currency),
+        amountDisplay: showAmountInSubscriptionsPage.value
+            ? formatAmountToLocalizedNumeralsWithCurrency(subscription.amount, subscription.currency)
+            : formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, subscription.currency),
         convertedAmountDisplay: subscription.currency !== defaultCurrency.value
-            ? (convertedAmount !== null ? formatAmountToLocalizedNumeralsWithCurrency(Math.round(convertedAmount), defaultCurrency.value) : '-')
+            ? (!showAmountInSubscriptionsPage.value
+                ? formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value)
+                : (convertedAmount !== null ? formatAmountToLocalizedNumeralsWithCurrency(Math.round(convertedAmount), defaultCurrency.value) : '-'))
             : '',
         categoryName: [category.primaryName, category.subName].filter(Boolean).join(' '),
         primaryCategoryName: category.primaryName,

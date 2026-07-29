@@ -4,6 +4,9 @@
             <f7-nav-left :back-link="tt('Back')"></f7-nav-left>
             <f7-nav-title>{{ tt('Subscriptions') }}</f7-nav-title>
             <f7-nav-right>
+                <f7-link @click="showAmountInSubscriptionsPage = !showAmountInSubscriptionsPage">
+                    <f7-icon class="ebk-hide-icon" :f7="showAmountInSubscriptionsPage ? 'eye_slash_fill' : 'eye_fill'"></f7-icon>
+                </f7-link>
                 <f7-link icon-f7="plus" @click="openAddPopup" />
             </f7-nav-right>
         </f7-navbar>
@@ -195,6 +198,7 @@ import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useTransactionTemplatesStore } from '@/stores/transactionTemplate.ts';
 import { useExchangeRatesStore } from '@/stores/exchangeRates.ts';
+import { useSettingsStore } from '@/stores/setting.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 import {
     parseDateTimeFromUnixTime,
@@ -207,6 +211,7 @@ import type { TransactionTemplate } from '@/models/transaction_template.ts';
 import type { LocalizedCurrencyInfo } from '@/core/currency.ts';
 import type { TextualYearMonthDay } from '@/core/datetime.ts';
 import type { ApiResponse } from '@/core/api.ts';
+import { DISPLAY_HIDDEN_AMOUNT } from '@/consts/numeral.ts';
 
 const {
     tt,
@@ -223,8 +228,14 @@ const accountsStore = useAccountsStore();
 const categoriesStore = useTransactionCategoriesStore();
 const templatesStore = useTransactionTemplatesStore();
 const exchangeRatesStore = useExchangeRatesStore();
+const settingsStore = useSettingsStore();
 
 const defaultCurrency = computed<string>(() => userStore.currentUserDefaultCurrency);
+
+const showAmountInSubscriptionsPage = computed<boolean>({
+    get: () => settingsStore.appSettings.showAmountInSubscriptionsPage,
+    set: (value) => settingsStore.setShowAmountInSubscriptionsPage(value)
+});
 const allCurrencies = computed<LocalizedCurrencyInfo[]>(() => getAllCurrencies());
 
 // ── Types ──────────────────────────────────────────────────
@@ -383,9 +394,13 @@ const tableItems = computed(() => subscriptions.value.map(subscription => {
         raw: subscription,
         id: subscription.id,
         name: subscription.name,
-        amountDisplay: formatAmountToLocalizedNumeralsWithCurrency(subscription.amount, subscription.currency),
+        amountDisplay: showAmountInSubscriptionsPage.value
+            ? formatAmountToLocalizedNumeralsWithCurrency(subscription.amount, subscription.currency)
+            : formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, subscription.currency),
         convertedAmountDisplay: subscription.currency !== defaultCurrency.value && convertedAmount !== null
-            ? formatAmountToLocalizedNumeralsWithCurrency(Math.round(convertedAmount), defaultCurrency.value)
+            ? (showAmountInSubscriptionsPage.value
+                ? formatAmountToLocalizedNumeralsWithCurrency(Math.round(convertedAmount), defaultCurrency.value)
+                : formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value))
             : '',
         categoryName: categoryNameFromTemplate(template),
         accountCoverage: accountCoverage(subscription, template),
