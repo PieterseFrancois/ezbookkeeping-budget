@@ -1660,6 +1660,8 @@
     "Application Settings": "Application Settings",
     "Transaction Data": "Transaction Data",
     "Basis Data": "Basis Data",
+    "Financial Control": "Financial Control",
+    "Control": "Control",
     "Select All": "Select All",
     "Select None": "Select None",
     "Invert Selection": "Invert Selection",

@@ -183,9 +183,10 @@
                 <f7-icon f7="chart_pie"></f7-icon>
                 <span class="tabbar-label">{{ tt('Statistics') }}</span>
             </f7-link>
-            <f7-link class="link" href="/goals">
-                <f7-icon f7="flag_2"></f7-icon>
-                <span class="tabbar-label">{{ tt('Goals') }}</span>
+            <f7-link id="homepage-financial-control-button" class="link"
+                     href="#" @click="showFinancialControlPopover = true">
+                <f7-icon f7="square_grid_2x2"></f7-icon>
+                <span class="tabbar-label">{{ tt('Control') }}</span>
             </f7-link>
             <f7-link class="link" href="/settings">
                 <f7-icon f7="gear_alt"></f7-icon>
@@ -217,6 +218,23 @@
                               v-for="template in allTransactionTemplates">
                     <template #media>
                         <f7-icon f7="doc_plaintext"></f7-icon>
+                    </template>
+                </f7-list-item>
+            </f7-list>
+        </f7-popover>
+
+        <!-- Financial control entries; add future pages (e.g. reports) as further list items here -->
+        <f7-popover class="financial-control-popover-menu" target-el="#homepage-financial-control-button"
+                    v-model:opened="showFinancialControlPopover">
+            <f7-list dividers>
+                <f7-list-item popover-close link="/budget" :title="tt('Budget')">
+                    <template #media>
+                        <f7-icon f7="creditcard_fill"></f7-icon>
+                    </template>
+                </f7-list-item>
+                <f7-list-item popover-close link="/goals" :title="tt('Goals')">
+                    <template #media>
+                        <f7-icon f7="flag_2"></f7-icon>
                     </template>
                 </f7-list-item>
             </f7-list>
@@ -293,6 +311,7 @@ const aiImageRecognitionSheet = useTemplateRef<AIImageRecognitionSheetType>('aiI
 const loading = ref<boolean>(true);
 const loadingBudget = ref<boolean>(true);
 const showTransactionTemplatePopover = ref<boolean>(false);
+const showFinancialControlPopover = ref<boolean>(false);
 const showAIReceiptImageRecognitionSheet = ref<boolean>(false);
 
 const budgetSummary = ref<BudgetSummaryItem[]>([]);
