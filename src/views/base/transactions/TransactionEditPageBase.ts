@@ -343,7 +343,15 @@ export function useTransactionEditPageBase(type: TransactionEditPageType, initMo
         }
     });
 
-    const inputEmptyProblemMessage = computed<string | null>(() => {
+    // a new transaction may be saved as a draft, where category/account are allowed to be left
+    // unset; the split-button group is therefore enabled based on this looser requirement, and the
+    // stricter category/account check (getCategoryAndAccountProblemMessage) is only enforced at the
+    // moment a non-draft save action is actually invoked (see save() in the dialog/page components)
+    const canSkipCategoryAndAccountValidation = computed<boolean>(() => {
+        return type === TransactionEditPageType.Transaction && mode.value === TransactionEditPageMode.Add;
+    });
+
+    function getCategoryAndAccountProblemMessage(): string | null {
         if (transaction.value.type === TransactionType.Expense) {
             if (!transaction.value.expenseCategoryId || transaction.value.expenseCategoryId === '') {
                 return 'Transaction category cannot be blank';
@@ -371,6 +379,18 @@ export function useTransactionEditPageBase(type: TransactionEditPageType, initMo
 
             if (!transaction.value.destinationAccountId || transaction.value.destinationAccountId === '') {
                 return 'Destination account cannot be blank';
+            }
+        }
+
+        return null;
+    }
+
+    const inputEmptyProblemMessage = computed<string | null>(() => {
+        if (!canSkipCategoryAndAccountValidation.value) {
+            const categoryAndAccountProblemMessage = getCategoryAndAccountProblemMessage();
+
+            if (categoryAndAccountProblemMessage) {
+                return categoryAndAccountProblemMessage;
             }
         }
 
@@ -604,6 +624,7 @@ export function useTransactionEditPageBase(type: TransactionEditPageType, initMo
         inputEmptyProblemMessage,
         inputIsEmpty,
         // functions
+        getCategoryAndAccountProblemMessage,
         createNewTransactionModel,
         setTransactionModel,
         updateTransactionModelFromRecognizedResponse,

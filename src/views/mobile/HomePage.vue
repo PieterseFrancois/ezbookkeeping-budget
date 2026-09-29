@@ -166,9 +166,13 @@
         <budget-overview-card :loading="loadingBudget" :budget-summary="budgetSummary" :unbudgeted="unbudgeted" :cycle-note="budgetCycleNote" />
 
         <f7-toolbar tabbar icons bottom class="main-tabbar">
-            <f7-link class="link" href="/transaction/list">
+            <f7-link class="link" href="/transaction/list" style="position: relative;">
                 <f7-icon f7="square_list"></f7-icon>
                 <span class="tabbar-label">{{ tt('Details') }}</span>
+                <f7-badge color="orange" v-if="transactionDraftsStore.draftCount > 0"
+                          style="position: absolute; top: 2px; right: 18%; min-width: 14px; height: 14px; font-size: 9px; line-height: 14px;">
+                    {{ formatNumberToLocalizedNumerals(transactionDraftsStore.draftCount) }}
+                </f7-badge>
             </f7-link>
             <f7-link class="link" href="/account/list">
                 <f7-icon f7="creditcard"></f7-icon>
@@ -269,6 +273,7 @@ import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useTransactionTemplatesStore } from '@/stores/transactionTemplate.ts';
 import { useOverviewStore } from '@/stores/overview.ts';
 import { useUserStore } from '@/stores/user.ts';
+import { useTransactionDraftsStore } from '@/stores/transactionDraft.ts';
 
 import { DateRange } from '@/core/datetime.ts';
 import { CategoryType } from '@/core/category.ts';
@@ -293,7 +298,7 @@ const props = defineProps<{
     f7router: Router.Router;
 }>();
 
-const { tt } = useI18n();
+const { tt, formatNumberToLocalizedNumerals } = useI18n();
 const { showToast } = useI18nUIComponents();
 
 const {
@@ -310,6 +315,7 @@ const transactionCategoriesStore = useTransactionCategoriesStore();
 const transactionTemplatesStore = useTransactionTemplatesStore();
 const overviewStore = useOverviewStore();
 const userStore = useUserStore();
+const transactionDraftsStore = useTransactionDraftsStore();
 
 const aiImageRecognitionSheet = useTemplateRef<AIImageRecognitionSheetType>('aiImageRecognitionSheet');
 
@@ -475,7 +481,8 @@ function init(): void {
             accountsStore.loadAllAccounts({ force: false }),
             transactionCategoriesStore.loadAllCategories({ force: false }).then(() => loadBudgetOverview().finally(() => { loadingBudget.value = false; })),
             transactionTemplatesStore.loadAllTemplates({ templateType: TemplateType.Normal.type,  force: false }),
-            overviewStore.loadTransactionOverview({ force: false })
+            overviewStore.loadTransactionOverview({ force: false }),
+            transactionDraftsStore.refreshDraftCount()
         ];
 
         Promise.all(promises).then(responses => {
@@ -497,6 +504,8 @@ function init(): void {
 
 function reload(done?: () => void): void {
     const force = !!done;
+
+    transactionDraftsStore.refreshDraftCount();
 
     overviewStore.loadTransactionOverview({
         force: force

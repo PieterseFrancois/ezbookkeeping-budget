@@ -510,6 +510,47 @@ func (s *TransactionService) GetTransactionByTransactionId(c core.Context, uid i
 	return transaction, nil
 }
 
+// ReleaseSourceFromDeletedTransactions clears the source column on any soft-deleted transaction
+// rows that still hold the given source, so a later insert reusing that source (e.g. confirming a
+// draft after the previously-confirmed transaction for the same source was deleted) doesn't fail
+// against the unique index on (uid, source), which doesn't exempt soft-deleted rows.
+func (s *TransactionService) ReleaseSourceFromDeletedTransactions(c core.Context, uid int64, source string) error {
+	if uid <= 0 {
+		return errs.ErrUserIdInvalid
+	}
+
+	if source == "" {
+		return nil
+	}
+
+	_, err := s.UserDataDB(uid).NewSession(c).Cols("source").Where("uid=? AND deleted=? AND source=?", uid, true, source).Update(&models.Transaction{Source: nil})
+
+	return err
+}
+
+// GetTransactionBySource returns a transaction model according to its source, used to look up a
+// confirmed transaction that was originally promoted from a transaction draft
+func (s *TransactionService) GetTransactionBySource(c core.Context, uid int64, source string) (*models.Transaction, error) {
+	if uid <= 0 {
+		return nil, errs.ErrUserIdInvalid
+	}
+
+	if source == "" {
+		return nil, errs.ErrTransactionNotFound
+	}
+
+	transaction := &models.Transaction{}
+	has, err := s.UserDataDB(uid).NewSession(c).Where("uid=? AND deleted=? AND source=?", uid, false, source).Get(transaction)
+
+	if err != nil {
+		return nil, err
+	} else if !has {
+		return nil, errs.ErrTransactionNotFound
+	}
+
+	return transaction, nil
+}
+
 // GetTransactionsByTransactionIds returns transaction models according to transaction ids
 func (s *TransactionService) GetTransactionsByTransactionIds(c core.Context, uid int64, transactionIds []int64) ([]*models.Transaction, error) {
 	if uid <= 0 {
@@ -591,7 +632,9 @@ func (s *TransactionService) CreateTransaction(c core.Context, transaction *mode
 		return errs.ErrSystemIsBusy
 	}
 
-	transaction.TransactionId = transactionUuids[0]
+	if transaction.TransactionId == 0 {
+		transaction.TransactionId = transactionUuids[0]
+	}
 
 	if transaction.Type == models.TRANSACTION_DB_TYPE_TRANSFER_OUT || transaction.Type == models.TRANSACTION_DB_TYPE_TRANSFER_IN {
 		transaction.RelatedId = transactionUuids[1]

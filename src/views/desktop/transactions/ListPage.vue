@@ -116,6 +116,14 @@
                                                     </v-list>
                                                 </v-menu>
                                             </v-btn>
+                                            <v-btn class="ms-2" color="default" variant="outlined"
+                                                   :disabled="loading" @click="router.push('/transaction/drafts')">
+                                                {{ tt('Drafts') }}
+                                                <v-chip class="ms-2" color="warning" size="x-small" density="comfortable"
+                                                        v-if="transactionDraftsStore.draftCount > 0">
+                                                    {{ formatNumberToLocalizedNumerals(transactionDraftsStore.draftCount) }}
+                                                </v-chip>
+                                            </v-btn>
                                             <v-btn density="compact" color="default" variant="text" size="24"
                                                    class="ms-2" :icon="true" :loading="loading" @click="reload(true, false)">
                                                 <template #loader>
@@ -736,6 +744,7 @@ import { useI18n } from '@/locales/helpers.ts';
 import { TransactionListPageType, useTransactionListPageBase } from '@/views/base/transactions/TransactionListPageBase.ts';
 
 import { useSettingsStore } from '@/stores/setting.ts';
+import { useTransactionDraftsStore } from '@/stores/transactionDraft.ts';
 import { useUserStore } from '@/stores/user.ts';
 import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
@@ -922,6 +931,7 @@ const {
 } = useTransactionListPageBase();
 
 const settingsStore = useSettingsStore();
+const transactionDraftsStore = useTransactionDraftsStore();
 const userStore = useUserStore();
 const accountsStore = useAccountsStore();
 const transactionCategoriesStore = useTransactionCategoriesStore();
@@ -1888,6 +1898,7 @@ watch(() => desktopPageStore.showAddTransactionDialogInTransactionList, (newValu
 });
 
 init(props);
+transactionDraftsStore.refreshDraftCount();
 </script>
 
 <style>

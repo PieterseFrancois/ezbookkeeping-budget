@@ -97,6 +97,16 @@ import {
     TransactionAmountsRequest
 } from '@/models/transaction.ts';
 import type {
+    TransactionDraftCreateRequest,
+    TransactionDraftModifyRequest,
+    TransactionDraftGetBySourceRequest,
+    TransactionDraftDeleteRequest,
+    TransactionDraftConfirmRequest,
+    TransactionDraftInfoResponse,
+    TransactionOrDraftInfoResponse,
+    TransactionDraftCountResponse
+} from '@/models/transaction_draft.ts';
+import type {
     TransactionCategoryCreateRequest,
     TransactionCategoryCreateBatchRequest,
     TransactionCategoryModifyRequest,
@@ -661,6 +671,27 @@ export default {
     },
     deleteTransaction: (req: TransactionDeleteRequest): ApiResponsePromise<boolean> => {
         return axios.post<ApiResponse<boolean>>('v1/transactions/delete.json', req);
+    },
+    addTransactionDraft: (req: TransactionDraftCreateRequest): ApiResponsePromise<TransactionDraftInfoResponse> => {
+        return axios.post<ApiResponse<TransactionDraftInfoResponse>>('v1/transaction_drafts/add.json', req);
+    },
+    getTransactionOrDraftBySource: (req: TransactionDraftGetBySourceRequest): ApiResponsePromise<TransactionOrDraftInfoResponse> => {
+        return axios.post<ApiResponse<TransactionOrDraftInfoResponse>>('v1/transaction_drafts/get_by_source.json', req);
+    },
+    modifyTransactionDraftBySource: (req: TransactionDraftModifyRequest): ApiResponsePromise<TransactionOrDraftInfoResponse> => {
+        return axios.post<ApiResponse<TransactionOrDraftInfoResponse>>('v1/transaction_drafts/modify.json', req);
+    },
+    deleteTransactionDraftBySource: (req: TransactionDraftDeleteRequest): ApiResponsePromise<boolean> => {
+        return axios.post<ApiResponse<boolean>>('v1/transaction_drafts/delete.json', req);
+    },
+    listTransactionDrafts: ({ page, count }: { page: number, count: number }): ApiResponsePromise<TransactionDraftInfoResponse[]> => {
+        return axios.get<ApiResponse<TransactionDraftInfoResponse[]>>(`v1/transaction_drafts/list.json?page=${page}&count=${count}`);
+    },
+    getTransactionDraftCount: (): ApiResponsePromise<TransactionDraftCountResponse> => {
+        return axios.get<ApiResponse<TransactionDraftCountResponse>>('v1/transaction_drafts/count.json');
+    },
+    confirmTransactionDraft: (req: TransactionDraftConfirmRequest): ApiResponsePromise<TransactionInfoResponse> => {
+        return axios.post<ApiResponse<TransactionInfoResponse>>('v1/transaction_drafts/confirm.json', req);
     },
     setTransactionBudgetOverride: (req: TransactionBudgetOverrideSetRequest): ApiResponsePromise<boolean> => {
         return axios.post<ApiResponse<boolean>>('v1/budget/transaction/override/set.json', req);

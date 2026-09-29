@@ -2,10 +2,12 @@
     <f7-page @page:afterin="onPageAfterIn" @page:beforeout="onPageBeforeOut">
         <f7-navbar>
             <f7-nav-left :class="{ 'disabled': loading }" :back-link="tt('Back')"></f7-nav-left>
-            <f7-nav-title :title="tt(title)"></f7-nav-title>
+            <f7-nav-title :title="editingDraftSource ? tt('Edit Transaction Draft') : tt(title)"></f7-nav-title>
             <f7-nav-right :class="{ 'navbar-compact-icons': true, 'disabled': loading }" v-if="mode !== TransactionEditPageMode.View || transaction.type !== TransactionType.ModifyBalance">
                 <f7-link icon-f7="ellipsis" @click="showMoreActionSheet = true"></f7-link>
-                <f7-link icon-f7="checkmark_alt" :class="{ 'disabled': inputIsEmpty || submitting || recognizing }" @click="save(AfterSaveAction.GoBack)" v-if="mode !== TransactionEditPageMode.View"></f7-link>
+                <f7-link id="save-navbar-button" icon-f7="checkmark_alt" :class="{ 'disabled': inputIsEmpty || submitting || recognizing }"
+                         @click="save(AfterSaveAction.GoBack)" @taphold="openQuickSaveMenu('#save-navbar-button')"
+                         v-if="mode !== TransactionEditPageMode.View"></f7-link>
             </f7-nav-right>
         </f7-navbar>
 
@@ -500,28 +502,34 @@
         <template #fixed v-if="quickSaveButtonStyleType === TransactionQuickSaveButtonStyle.BottomLeftFloating.type || quickSaveButtonStyleType === TransactionQuickSaveButtonStyle.BottomCenterFloating.type || quickSaveButtonStyleType === TransactionQuickSaveButtonStyle.BottomRightFloating.type">
             <f7-fab id="quick-save-button" :class="{ 'disabled': inputIsEmpty || submitting || recognizing }" :position="quickSaveButtonFloatingPosition"
                     :text="tt(quickSaveButtonTitle)"
-                    @click="quickSave" v-if="mode !== TransactionEditPageMode.View">
+                    @click="quickSave" @taphold="openQuickSaveMenu('#quick-save-button')" v-if="mode !== TransactionEditPageMode.View">
             </f7-fab>
         </template>
 
         <f7-toolbar id="quick-save-button" class="compact-tabbar" tabbar bottom v-if="quickSaveButtonStyleType === TransactionQuickSaveButtonStyle.BottomFixed.type && mode !== TransactionEditPageMode.View">
-            <f7-link :class="{ 'disabled': inputIsEmpty || submitting || recognizing }" @click="quickSave">
+            <f7-link :class="{ 'disabled': inputIsEmpty || submitting || recognizing }" @click="quickSave" @taphold="openQuickSaveMenu('#quick-save-button')">
                 <span class="tabbar-primary-link">{{ tt(quickSaveButtonTitle) }}</span>
             </f7-link>
         </f7-toolbar>
 
-        <f7-popover class="quick-save-popover" target-el="#quick-save-button"
+        <f7-popover class="quick-save-popover" :target-el="quickSavePopoverTargetEl"
                     v-model:opened="showQuickSavePopover">
             <f7-list>
                 <f7-list-item link="#" no-chevron popover-close
-                              :title="tt(TransactionQuickAddButtonActionType.SaveAndGoBack.name)"
+                              :title="editingDraftSource ? tt('Confirm') : tt(TransactionQuickAddButtonActionType.SaveAndGoBack.name)"
                               @click="save(AfterSaveAction.GoBack)"></f7-list-item>
                 <f7-list-item link="#" no-chevron popover-close
                               :title="tt(TransactionQuickAddButtonActionType.SaveAndAddNewTransaction.name)"
+                              v-if="!editingDraftSource"
                               @click="save(AfterSaveAction.StayWithNewTransaction)"></f7-list-item>
                 <f7-list-item link="#" no-chevron popover-close
                               :title="tt(TransactionQuickAddButtonActionType.SaveAndKeepCurrentData.name)"
+                              v-if="!editingDraftSource"
                               @click="save(AfterSaveAction.StayWithCurrentTransaction)"></f7-list-item>
+                <f7-list-item link="#" no-chevron popover-close
+                              :title="tt('Save as Draft')"
+                              v-if="pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode === TransactionEditPageMode.Add"
+                              @click="save(AfterSaveAction.GoBack, true)"></f7-list-item>
             </f7-list>
         </f7-popover>
 
@@ -554,6 +562,7 @@ import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useTransactionTagsStore } from '@/stores/transactionTag.ts';
 import { useTransactionsStore } from '@/stores/transaction.ts';
 import { useTransactionTemplatesStore } from '@/stores/transactionTemplate.ts';
+import { useTransactionDraftsStore } from '@/stores/transactionDraft.ts';
 
 import { CategoryType } from '@/core/category.ts';
 import {
@@ -581,6 +590,8 @@ import {
 } from '@/lib/datetime.ts';
 import { formatCoordinate } from '@/lib/coordinate.ts';
 import { generateRandomUUID } from '@/lib/misc.ts';
+import services from '@/lib/services.ts';
+import type { TransactionDraftCreateRequest, TransactionDraftModifyRequest, TransactionDraftConfirmRequest } from '@/models/transaction_draft.ts';
 import { getTransactionPrimaryCategoryName, getTransactionSecondaryCategoryName } from '@/lib/category.ts';
 import { type SetTransactionOptions } from '@/lib/transaction.ts';
 import {
@@ -659,6 +670,7 @@ const {
     transactionDescriptionTitle,
     inputEmptyProblemMessage,
     inputIsEmpty,
+    getCategoryAndAccountProblemMessage,
     setTransactionModel,
     updateTransactionModelFromRecognizedResponse,
     updateTransactionModelByAfterSaveAction,
@@ -678,16 +690,22 @@ const transactionCategoriesStore = useTransactionCategoriesStore();
 const transactionTagsStore = useTransactionTagsStore();
 const transactionsStore = useTransactionsStore();
 const transactionTemplatesStore = useTransactionTemplatesStore();
+const transactionDraftsStore = useTransactionDraftsStore();
 
 const pictureBrowser = useTemplateRef<PhotoBrowser.PhotoBrowser>('pictureBrowser');
 const pictureInput = useTemplateRef<HTMLInputElement>('pictureInput');
 
 const loadingError = ref<unknown | null>(null);
+// when set, this Add-mode session is editing an existing transaction draft (identified by its
+// source) rather than creating something new; save() routes to the draft modify/confirm APIs
+// instead of creating a new draft or a new confirmed transaction
+const editingDraftSource = ref<string | null>(null);
 const removingPictureId = ref<string | null>(null);
 const pastedText = ref<string>('');
 const transactionDateTimeSheetMode = ref<string>('time');
 const showTimeInDefaultTimezone = ref<boolean>(false);
 const showQuickSavePopover = ref<boolean>(false);
+const quickSavePopoverTargetEl = ref<string>('#quick-save-button');
 const showTimezonePopup = ref<boolean>(false);
 const showGeoLocationActionSheet = ref<boolean>(false);
 const showMoreActionSheet = ref<boolean>(false);
@@ -956,6 +974,7 @@ function init(): void {
         return;
     }
 
+    editingDraftSource.value = null;
     loading.value = true;
 
     const promises: Promise<unknown>[] = [
@@ -1033,6 +1052,17 @@ function init(): void {
         if (pageTypeAndMode.type === TransactionEditPageType.Transaction) {
             if (query['id'] && responses[4] instanceof Transaction) {
                 fromTransaction = responses[4];
+            } else if (query['draftSource']) {
+                const pendingDraft = transactionDraftsStore.takePendingEditDraft(query['draftSource']);
+
+                if (pendingDraft) {
+                    fromTransaction = Transaction.ofTransactionDraftResponse(pendingDraft);
+                    editingDraftSource.value = query['draftSource'];
+                } else {
+                    showToast('Unable to retrieve transaction draft');
+                    loadingError.value = 'Unable to retrieve transaction draft';
+                    return;
+                }
             } else if (query['templateId'] && transactionTemplatesStore.allTransactionTemplatesMap && transactionTemplatesStore.allTransactionTemplatesMap[TemplateType.Normal.type]) {
                 fromTransaction = (transactionTemplatesStore.allTransactionTemplatesMap[TemplateType.Normal.type] as Record<string, TransactionTemplate>)[query['templateId']] ?? null;
 
@@ -1103,7 +1133,7 @@ function init(): void {
     });
 }
 
-function save(afterAction: AfterSaveAction): void {
+function save(afterAction: AfterSaveAction, asDraft: boolean = false): void {
     const router = props.f7router;
 
     if (mode.value === TransactionEditPageMode.View) {
@@ -1114,6 +1144,144 @@ function save(afterAction: AfterSaveAction): void {
 
     if (problemMessage) {
         showAlert(problemMessage);
+        return;
+    }
+
+    if (!asDraft) {
+        const categoryAndAccountProblemMessage = getCategoryAndAccountProblemMessage();
+
+        if (categoryAndAccountProblemMessage) {
+            showAlert(categoryAndAccountProblemMessage);
+            return;
+        }
+    }
+
+    if (pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode.value === TransactionEditPageMode.Add && asDraft) {
+        submitting.value = true;
+        showLoading(() => submitting.value);
+
+        const draftTransaction = transaction.value as Transaction;
+        const draftFields = {
+            type: draftTransaction.type,
+            categoryId: draftTransaction.getCategoryId() || undefined,
+            time: draftTransaction.time,
+            utcOffset: draftTransaction.utcOffset,
+            accountId: draftTransaction.sourceAccountId || undefined,
+            destinationAccountId: draftTransaction.type === TransactionType.Transfer ? (draftTransaction.destinationAccountId || undefined) : undefined,
+            amount: draftTransaction.sourceAmount,
+            destinationAmount: draftTransaction.type === TransactionType.Transfer ? draftTransaction.destinationAmount : undefined,
+            hideAmount: draftTransaction.hideAmount,
+            tagIds: draftTransaction.tagIds,
+            pictureIds: draftTransaction.getPictureIds(),
+            comment: draftTransaction.comment,
+            excludeFromBudget: draftTransaction.excludeFromBudget
+        };
+
+        const savePromise = editingDraftSource.value
+            ? services.modifyTransactionDraftBySource({ source: editingDraftSource.value, ...draftFields })
+            : services.addTransactionDraft({ ...draftFields, source: `manual:${generateRandomUUID()}` } as TransactionDraftCreateRequest);
+
+        savePromise.then(response => {
+            submitting.value = false;
+            hideLoading();
+
+            if (!response.data || !response.data.success || !response.data.result) {
+                showToast('Unable to save transaction draft');
+                return;
+            }
+
+            submitted.value = true;
+
+            const message = editingDraftSource.value ? 'You have saved this transaction draft' : 'You have saved a new transaction draft';
+
+            if (afterAction === AfterSaveAction.StayWithNewTransaction || afterAction === AfterSaveAction.StayWithCurrentTransaction) {
+                showToast(message);
+                updateTransactionModelByAfterSaveAction(afterAction, getQueryTransactionOptions());
+                clientSessionId.value = generateRandomUUID();
+            } else {
+                showToast(message);
+                router.back();
+            }
+        }).catch(error => {
+            submitting.value = false;
+            hideLoading();
+
+            if (!error.processed) {
+                showToast(error.message || error);
+            }
+        });
+
+        return;
+    }
+
+    if (pageTypeAndMode?.type === TransactionEditPageType.Transaction && mode.value === TransactionEditPageMode.Add && editingDraftSource.value && !asDraft) {
+        submitting.value = true;
+        showLoading(() => submitting.value);
+
+        const draftSource = editingDraftSource.value;
+        const editedTransaction = transaction.value as Transaction;
+        const modifyReq: TransactionDraftModifyRequest = {
+            source: draftSource,
+            type: editedTransaction.type,
+            categoryId: editedTransaction.getCategoryId() || undefined,
+            time: editedTransaction.time,
+            utcOffset: editedTransaction.utcOffset,
+            accountId: editedTransaction.sourceAccountId || undefined,
+            destinationAccountId: editedTransaction.type === TransactionType.Transfer ? (editedTransaction.destinationAccountId || undefined) : undefined,
+            amount: editedTransaction.sourceAmount,
+            destinationAmount: editedTransaction.type === TransactionType.Transfer ? editedTransaction.destinationAmount : undefined,
+            hideAmount: editedTransaction.hideAmount,
+            tagIds: editedTransaction.tagIds,
+            pictureIds: editedTransaction.getPictureIds(),
+            comment: editedTransaction.comment,
+            excludeFromBudget: editedTransaction.excludeFromBudget
+        };
+
+        services.modifyTransactionDraftBySource(modifyReq).then(response => {
+            if (!response.data || !response.data.success || !response.data.result) {
+                submitting.value = false;
+                hideLoading();
+                showToast('Unable to save transaction draft');
+                return;
+            }
+
+            const confirmReq: TransactionDraftConfirmRequest = {
+                source: draftSource,
+                categoryId: editedTransaction.getCategoryId() || undefined,
+                accountId: editedTransaction.sourceAccountId || undefined,
+                destinationAccountId: editedTransaction.type === TransactionType.Transfer ? (editedTransaction.destinationAccountId || undefined) : undefined,
+                excludeFromBudget: editedTransaction.excludeFromBudget
+            };
+
+            services.confirmTransactionDraft(confirmReq).then(confirmResponse => {
+                submitting.value = false;
+                hideLoading();
+
+                if (!confirmResponse.data || !confirmResponse.data.success || !confirmResponse.data.result) {
+                    showToast('Unable to confirm transaction draft');
+                    return;
+                }
+
+                submitted.value = true;
+                showToast('You have confirmed this transaction draft');
+                router.back();
+            }).catch(error => {
+                submitting.value = false;
+                hideLoading();
+
+                if (!error.processed) {
+                    showToast(error.message || error);
+                }
+            });
+        }).catch(error => {
+            submitting.value = false;
+            hideLoading();
+
+            if (!error.processed) {
+                showToast(error.message || error);
+            }
+        });
+
         return;
     }
 
@@ -1239,6 +1407,15 @@ function quickSave(): void {
     }
 
     save(AfterSaveAction.GoBack);
+}
+
+function openQuickSaveMenu(targetEl: string): void {
+    if (mode.value !== TransactionEditPageMode.Add || pageTypeAndMode?.type !== TransactionEditPageType.Transaction) {
+        return;
+    }
+
+    quickSavePopoverTargetEl.value = targetEl;
+    showQuickSavePopover.value = true;
 }
 
 function recognizeText(text: string): void {

@@ -143,6 +143,11 @@ type Transaction struct {
 	CreatedUnixTime      int64
 	UpdatedUnixTime      int64
 	DeletedUnixTime      int64
+	// Source is nullable (*string, not string) so that multiple transactions with no source never collide
+	// under the unique index below: xorm stores the Go zero value "" for a plain string column as an empty
+	// string (not NULL) on every supported engine here, and MySQL/Postgres/SQLite all treat two empty
+	// strings as equal under a unique constraint, while multiple NULLs are always allowed.
+	Source *string `xorm:"UNIQUE(UQE_transaction_uid_source) VARCHAR(255) NULL"`
 }
 
 // TransactionWithAccountBalance represents a transaction item with account balance

@@ -7,6 +7,7 @@ import { Account, type AccountInfoResponse } from './account.ts';
 import { TransactionCategory, type TransactionCategoryInfoResponse } from './transaction_category.ts';
 import { TransactionTag, type TransactionTagInfoResponse } from './transaction_tag.ts';
 import { TransactionPicture, type TransactionPictureInfoBasicResponse } from './transaction_picture_info.ts';
+import type { TransactionDraftInfoResponse } from './transaction_draft.ts';
 
 export class Transaction implements TransactionInfoResponse {
     public id: string;
@@ -413,6 +414,36 @@ export class Transaction implements TransactionInfoResponse {
             }
 
             transaction.setPictures(pictures);
+        }
+
+        return transaction;
+    }
+
+    // builds an editable Transaction model from a transaction_drafts API response (a staged,
+    // unconfirmed transaction from the transaction draft feature) - distinct from ofDraft() above,
+    // which converts the unrelated browser-local "autosave the in-progress form" draft concept
+    public static ofTransactionDraftResponse(draftResponse: TransactionDraftInfoResponse): Transaction {
+        const transaction: Transaction = new Transaction(
+            '', // id
+            '', // timeSequenceId
+            draftResponse.type,
+            draftResponse.categoryId ?? '',
+            draftResponse.time,
+            undefined,
+            draftResponse.utcOffset,
+            draftResponse.accountId ?? '',
+            draftResponse.destinationAccountId ?? '',
+            draftResponse.amount ?? 0,
+            draftResponse.destinationAmount ?? 0,
+            draftResponse.hideAmount ?? false,
+            draftResponse.tagIds ?? [],
+            draftResponse.comment ?? '',
+            true, // editable
+            draftResponse.excludeFromBudget ?? false
+        );
+
+        if (draftResponse.pictures && draftResponse.pictures.length) {
+            transaction.setPictures(TransactionPicture.ofMulti(draftResponse.pictures));
         }
 
         return transaction;

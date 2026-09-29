@@ -4,7 +4,7 @@
             <template #title>
                 <div class="d-flex align-center justify-center">
                     <div class="d-flex align-center">
-                        <h4 class="text-h4">{{ tt(title) }}</h4>
+                        <h4 class="text-h4">{{ editingDraftSource ? tt('Edit Transaction Draft') : tt(title) }}</h4>
                         <v-progress-circular indeterminate size="22" class="ms-2" v-if="loading"></v-progress-circular>
                     </div>
                     <v-spacer/>
@@ -441,7 +441,7 @@
                             <div v-bind="props" class="d-inline-block">
                                 <v-btn-group density="comfortable" v-if="mode === TransactionEditPageMode.Add || mode === TransactionEditPageMode.Edit">
                                     <v-btn color="primary" :disabled="inputIsEmpty || loading || submitting || recognizing" @click="save(AfterSaveAction.GoBack)">
-                                        {{ tt(saveButtonTitle) }}
+                                        {{ editingDraftSource ? tt('Confirm') : tt(saveButtonTitle) }}
                                         <v-progress-circular indeterminate size="22" class="ms-2" v-if="submitting"></v-progress-circular>
                                     </v-btn>
                                     <v-btn color="primary" density="compact"
@@ -451,9 +451,13 @@
                                         <v-menu activator="parent">
                                             <v-list>
                                                 <v-list-item :title="tt(TransactionQuickAddButtonActionType.SaveAndAddNewTransaction.name)"
-                                                             @click="save(AfterSaveAction.StayWithNewTransaction)"></v-list-item>
+                                                             @click="save(AfterSaveAction.StayWithNewTransaction)"
+                                                             v-if="!editingDraftSource"></v-list-item>
                                                 <v-list-item :title="tt(TransactionQuickAddButtonActionType.SaveAndKeepCurrentData.name)"
-                                                             @click="save(AfterSaveAction.StayWithCurrentTransaction)"></v-list-item>
+                                                             @click="save(AfterSaveAction.StayWithCurrentTransaction)"
+                                                             v-if="!editingDraftSource"></v-list-item>
+                                                <v-list-item :title="tt('Save as Draft')"
+                                                             @click="save(AfterSaveAction.GoBack, true)"></v-list-item>
                                             </v-list>
                                         </v-menu>
                                     </v-btn>
@@ -561,7 +565,7 @@ import { KnownErrorCode } from '@/consts/api.ts';
 import { SUPPORTED_IMAGE_EXTENSIONS } from '@/consts/file.ts';
 
 import { TransactionTemplate } from '@/models/transaction_template.ts';
-import type { TransactionPictureInfoBasicResponse } from '@/models/transaction_picture_info.ts';
+import { TransactionPicture, type TransactionPictureInfoBasicResponse } from '@/models/transaction_picture_info.ts';
 import { Transaction } from '@/models/transaction.ts';
 
 import { isDefined } from '@/lib/common.ts';
@@ -571,6 +575,8 @@ import {
 } from '@/lib/datetime.ts';
 import { formatCoordinate } from '@/lib/coordinate.ts';
 import { generateRandomUUID } from '@/lib/misc.ts';
+import services from '@/lib/services.ts';
+import type { TransactionDraftCreateRequest, TransactionDraftModifyRequest, TransactionDraftConfirmRequest } from '@/models/transaction_draft.ts';
 import {
     getTransactionPrimaryCategoryName,
     getTransactionSecondaryCategoryName
@@ -610,6 +616,13 @@ export interface TransactionEditOptions extends SetTransactionOptions {
     autoUploadPicture?: File;
     autoRecognizeClipboardText?: string;
     noTransactionDraft?: boolean;
+    // when set, this Add-mode session is editing an existing transaction draft (identified by its
+    // source) rather than creating something new; save() routes to the draft modify/confirm APIs
+    // instead of creating a new draft or a new confirmed transaction
+    draftSource?: string;
+    hideAmount?: boolean;
+    excludeFromBudget?: boolean;
+    pictures?: TransactionPictureInfoBasicResponse[];
 }
 
 interface TransactionEditResponse {
@@ -672,6 +685,7 @@ const {
     transactionDescriptionTitle,
     inputEmptyProblemMessage,
     inputIsEmpty,
+    getCategoryAndAccountProblemMessage,
     createNewTransactionModel,
     setTransactionModel,
     updateTransactionModelFromRecognizedResponse,
@@ -700,6 +714,7 @@ const showPasteTextDialog = ref<boolean>(false);
 const activeTab = ref<string>('basicInfo');
 const originalTransactionEditable = ref<boolean>(false);
 const noTransactionDraft = ref<boolean>(false);
+const editingDraftSource = ref<string | null>(null);
 const geoMenuState = ref<boolean>(false);
 const removingPictureId = ref<string>('');
 const pastedText = ref<string>('');
@@ -743,11 +758,24 @@ function open(options: TransactionEditOptions): Promise<TransactionEditResponse 
     setGeoLocationByClickMap.value = false;
     originalTransactionEditable.value = false;
     noTransactionDraft.value = options.noTransactionDraft || false;
+    editingDraftSource.value = options.draftSource || null;
 
     initOptions.value = options;
 
     const newTransaction = createNewTransactionModel(options.type);
     setTransactionModel(newTransaction, options, true);
+
+    if (options.hideAmount !== undefined) {
+        newTransaction.hideAmount = options.hideAmount;
+    }
+
+    if (options.excludeFromBudget !== undefined) {
+        newTransaction.excludeFromBudget = options.excludeFromBudget;
+    }
+
+    if (options.pictures && options.pictures.length) {
+        newTransaction.setPictures(TransactionPicture.ofMulti(options.pictures));
+    }
 
     const promises: Promise<unknown>[] = [
         accountsStore.loadAllAccounts({ force: false }),
@@ -888,11 +916,152 @@ function open(options: TransactionEditOptions): Promise<TransactionEditResponse 
     });
 }
 
-function save(afterAction: AfterSaveAction): void {
+function save(afterAction: AfterSaveAction, asDraft: boolean = false): void {
     const problemMessage = inputEmptyProblemMessage.value;
 
     if (problemMessage) {
         snackbar.value?.showMessage(problemMessage);
+        return;
+    }
+
+    if (!asDraft) {
+        const categoryAndAccountProblemMessage = getCategoryAndAccountProblemMessage();
+
+        if (categoryAndAccountProblemMessage) {
+            snackbar.value?.showMessage(categoryAndAccountProblemMessage);
+            return;
+        }
+    }
+
+    if (props.type === TransactionEditPageType.Transaction && mode.value === TransactionEditPageMode.Add && asDraft) {
+        submitting.value = true;
+
+        const draftTransaction = transaction.value as Transaction;
+        const draftFields = {
+            type: draftTransaction.type,
+            categoryId: draftTransaction.getCategoryId() || undefined,
+            time: draftTransaction.time,
+            utcOffset: draftTransaction.utcOffset,
+            accountId: draftTransaction.sourceAccountId || undefined,
+            destinationAccountId: draftTransaction.type === TransactionType.Transfer ? (draftTransaction.destinationAccountId || undefined) : undefined,
+            amount: draftTransaction.sourceAmount,
+            destinationAmount: draftTransaction.type === TransactionType.Transfer ? draftTransaction.destinationAmount : undefined,
+            hideAmount: draftTransaction.hideAmount,
+            tagIds: draftTransaction.tagIds,
+            pictureIds: draftTransaction.getPictureIds(),
+            comment: draftTransaction.comment,
+            excludeFromBudget: draftTransaction.excludeFromBudget
+        };
+
+        const savePromise = editingDraftSource.value
+            ? services.modifyTransactionDraftBySource({ source: editingDraftSource.value, ...draftFields })
+            : services.addTransactionDraft({ ...draftFields, source: `manual:${generateRandomUUID()}` } as TransactionDraftCreateRequest);
+
+        savePromise.then(response => {
+            submitting.value = false;
+
+            if (!response.data || !response.data.success || !response.data.result) {
+                snackbar.value?.showMessage('Unable to save transaction draft');
+                return;
+            }
+
+            submitted.value = true;
+
+            const message = editingDraftSource.value ? 'You have saved this transaction draft' : 'You have saved a new transaction draft';
+
+            if (afterAction === AfterSaveAction.StayWithNewTransaction || afterAction === AfterSaveAction.StayWithCurrentTransaction) {
+                snackbar.value?.showMessage(message);
+                updateTransactionModelByAfterSaveAction(afterAction, initOptions.value);
+                clientSessionId.value = generateRandomUUID();
+            } else {
+                if (resolveFunc) {
+                    resolveFunc({
+                        message: message
+                    });
+                }
+
+                showState.value = false;
+            }
+        }).catch(error => {
+            submitting.value = false;
+
+            if (!error.processed) {
+                snackbar.value?.showError(error);
+            }
+        });
+
+        return;
+    }
+
+    if (props.type === TransactionEditPageType.Transaction && mode.value === TransactionEditPageMode.Add && editingDraftSource.value && !asDraft) {
+        submitting.value = true;
+
+        const draftSource = editingDraftSource.value;
+        const editedTransaction = transaction.value as Transaction;
+        const modifyReq: TransactionDraftModifyRequest = {
+            source: draftSource,
+            type: editedTransaction.type,
+            categoryId: editedTransaction.getCategoryId() || undefined,
+            time: editedTransaction.time,
+            utcOffset: editedTransaction.utcOffset,
+            accountId: editedTransaction.sourceAccountId || undefined,
+            destinationAccountId: editedTransaction.type === TransactionType.Transfer ? (editedTransaction.destinationAccountId || undefined) : undefined,
+            amount: editedTransaction.sourceAmount,
+            destinationAmount: editedTransaction.type === TransactionType.Transfer ? editedTransaction.destinationAmount : undefined,
+            hideAmount: editedTransaction.hideAmount,
+            tagIds: editedTransaction.tagIds,
+            pictureIds: editedTransaction.getPictureIds(),
+            comment: editedTransaction.comment,
+            excludeFromBudget: editedTransaction.excludeFromBudget
+        };
+
+        services.modifyTransactionDraftBySource(modifyReq).then(response => {
+            if (!response.data || !response.data.success || !response.data.result) {
+                submitting.value = false;
+                snackbar.value?.showMessage('Unable to save transaction draft');
+                return;
+            }
+
+            const confirmReq: TransactionDraftConfirmRequest = {
+                source: draftSource,
+                categoryId: editedTransaction.getCategoryId() || undefined,
+                accountId: editedTransaction.sourceAccountId || undefined,
+                destinationAccountId: editedTransaction.type === TransactionType.Transfer ? (editedTransaction.destinationAccountId || undefined) : undefined,
+                excludeFromBudget: editedTransaction.excludeFromBudget
+            };
+
+            services.confirmTransactionDraft(confirmReq).then(confirmResponse => {
+                submitting.value = false;
+
+                if (!confirmResponse.data || !confirmResponse.data.success || !confirmResponse.data.result) {
+                    snackbar.value?.showMessage('Unable to confirm transaction draft');
+                    return;
+                }
+
+                submitted.value = true;
+
+                if (resolveFunc) {
+                    resolveFunc({
+                        message: 'You have confirmed this transaction draft'
+                    });
+                }
+
+                showState.value = false;
+            }).catch(error => {
+                submitting.value = false;
+
+                if (!error.processed) {
+                    snackbar.value?.showError(error);
+                }
+            });
+        }).catch(error => {
+            submitting.value = false;
+
+            if (!error.processed) {
+                snackbar.value?.showError(error);
+            }
+        });
+
         return;
     }
 

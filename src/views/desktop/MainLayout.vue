@@ -30,6 +30,9 @@
                     <router-link to="/transaction/list?pageType=0&dateType=7">
                         <v-icon class="nav-item-icon" :icon="mdiListBoxOutline"/>
                         <span class="nav-item-title d-inline-block">{{ tt('Transaction Details') }}</span>
+                        <span class="nav-item-badge bg-warning ms-1" v-if="transactionDraftsStore.draftCount > 0">
+                            {{ formatNumberToLocalizedNumerals(transactionDraftsStore.draftCount) }}
+                        </span>
                         <v-btn density="compact" color="secondary" variant="text" size="22"
                                class="ms-1" :icon="true" v-if="showAddTransactionButtonInDesktopNavbar"
                                @click="showAddDialogInTransactionListPage">
@@ -240,6 +243,7 @@ import { useRootStore } from '@/stores/index.ts';
 import { useSettingsStore } from '@/stores/setting.ts';
 import { useUserStore } from '@/stores/user.ts';
 import { useDesktopPageStore } from '@/stores/desktopPage.ts';
+import { useTransactionDraftsStore } from '@/stores/transactionDraft.ts';
 
 import { APPLICATION_LOGO_PATH } from '@/consts/asset.ts';
 import { ThemeType } from '@/core/theme.ts';
@@ -284,12 +288,13 @@ const theme = useTheme();
 const route = useRoute();
 const router = useRouter();
 
-const { tt, initLocale } = useI18n();
+const { tt, formatNumberToLocalizedNumerals, initLocale } = useI18n();
 
 const rootStore = useRootStore();
 const settingsStore = useSettingsStore();
 const userStore = useUserStore();
 const desktopPageStore = useDesktopPageStore();
+const transactionDraftsStore = useTransactionDraftsStore();
 
 const snackbar = useTemplateRef<SnackBarType>('snackbar');
 
@@ -373,6 +378,7 @@ function showAddDialogInTransactionListPage(): void {
 }
 
 clearShareImageCache();
+transactionDraftsStore.refreshDraftCount();
 </script>
 
 <style>

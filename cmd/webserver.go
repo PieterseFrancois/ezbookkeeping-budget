@@ -422,6 +422,15 @@ func startWebServer(c *core.CliContext) error {
 				apiV1Route.GET("/transactions/import/process.json", bindApi(api.Transactions.TransactionImportProcessHandler, config))
 			}
 
+			// Transaction Drafts
+			apiV1Route.POST("/transaction_drafts/add.json", bindApi(api.TransactionDrafts.TransactionDraftCreateHandler, config))
+			apiV1Route.POST("/transaction_drafts/get_by_source.json", bindApi(api.TransactionDrafts.TransactionDraftGetBySourceHandler, config))
+			apiV1Route.POST("/transaction_drafts/modify.json", bindApi(api.TransactionDrafts.TransactionDraftModifyHandler, config))
+			apiV1Route.POST("/transaction_drafts/delete.json", bindApi(api.TransactionDrafts.TransactionDraftDeleteHandler, config))
+			apiV1Route.GET("/transaction_drafts/list.json", bindApi(api.TransactionDrafts.TransactionDraftListHandler, config))
+			apiV1Route.GET("/transaction_drafts/count.json", bindApi(api.TransactionDrafts.TransactionDraftCountHandler, config))
+			apiV1Route.POST("/transaction_drafts/confirm.json", bindApi(api.TransactionDrafts.TransactionDraftConfirmHandler, config))
+
 			// Transaction Pictures
 			if config.EnableTransactionPictures {
 				apiV1Route.POST("/transaction/pictures/upload.json", bindApi(api.TransactionPictures.TransactionPictureUploadHandler, config))

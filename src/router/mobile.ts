@@ -8,6 +8,7 @@ import SignUpPage from '@/views/mobile/SignupPage.vue';
 import UnlockPage from '@/views/mobile/UnlockPage.vue';
 
 import TransactionListPage from '@/views/mobile/transactions/ListPage.vue';
+import TransactionDraftsPage from '@/views/mobile/transactions/DraftsPage.vue';
 import TransactionEditPage from '@/views/mobile/transactions/EditPage.vue';
 import TransactionAmountFilterPage from '@/views/mobile/transactions/AmountFilterPage.vue';
 
@@ -164,6 +165,11 @@ const routes: Router.RouteParameters[] = [
     {
         path: '/transaction/list',
         async: asyncResolve(TransactionListPage),
+        beforeEnter: [checkLogin]
+    },
+    {
+        path: '/transaction/drafts',
+        async: asyncResolve(TransactionDraftsPage),
         beforeEnter: [checkLogin]
     },
     {

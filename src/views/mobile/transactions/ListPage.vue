@@ -16,6 +16,12 @@
                 </f7-link>
             </f7-nav-title>
             <f7-nav-right :class="{ 'navbar-compact-icons': true, 'disabled': loading }">
+                <f7-link icon-f7="tray_full" href="/transaction/drafts" style="position: relative;">
+                    <f7-badge color="orange" v-if="transactionDraftsStore.draftCount > 0"
+                              style="position: absolute; top: 2px; right: 2px; min-width: 14px; height: 14px; font-size: 9px; line-height: 14px;">
+                        {{ formatNumberToLocalizedNumerals(transactionDraftsStore.draftCount) }}
+                    </f7-badge>
+                </f7-link>
                 <f7-link icon-f7="search" @click="toggleSearchbar"></f7-link>
                 <f7-link icon-f7="plus" :class="{ 'disabled': !canAddTransaction }" @click="add"></f7-link>
             </f7-nav-right>
@@ -669,6 +675,7 @@ import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useTransactionTagsStore } from '@/stores/transactionTag.ts';
 import { type TransactionMonthList, useTransactionsStore } from '@/stores/transaction.ts';
+import { useTransactionDraftsStore } from '@/stores/transactionDraft.ts';
 
 import { keys } from '@/core/base.ts';
 import { TextDirection } from '@/core/text.ts';
@@ -720,6 +727,7 @@ const {
     tt,
     getCurrentLanguageTextDirection,
     getWeekdayShortName,
+    formatNumberToLocalizedNumerals,
     formatNumberToLocalizedNumeralsWithoutDigitGrouping
 } = useI18n();
 
@@ -784,6 +792,7 @@ const accountsStore = useAccountsStore();
 const transactionCategoriesStore = useTransactionCategoriesStore();
 const transactionTagsStore = useTransactionTagsStore();
 const transactionsStore = useTransactionsStore();
+const transactionDraftsStore = useTransactionDraftsStore();
 
 const loadingError = ref<unknown | null>(null);
 const loadingMore = ref<boolean>(false);
@@ -1524,6 +1533,7 @@ function onPageAfterIn(): void {
         reload();
     }
 
+    transactionDraftsStore.refreshDraftCount();
     routeBackOnError(props.f7router, loadingError);
 }
 

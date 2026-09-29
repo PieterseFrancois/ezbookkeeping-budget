@@ -19,6 +19,7 @@ import GoalsPage from '@/views/desktop/goals/GoalsPage.vue';
 import SubscriptionsPage from '@/views/desktop/subscriptions/SubscriptionsPage.vue';
 
 import TransactionListPage from '@/views/desktop/transactions/ListPage.vue';
+import TransactionDraftsPage from '@/views/desktop/transactions/DraftsPage.vue';
 
 import StatisticsTransactionPage from '@/views/desktop/statistics/TransactionPage.vue';
 
@@ -137,6 +138,11 @@ const router = createRouter({
                         initKeyword: route.query['keyword'],
                         initMatchMode: route.query['matchMode']
                     })
+                },
+                {
+                    path: '/transaction/drafts',
+                    component: TransactionDraftsPage,
+                    beforeEnter: checkLogin
                 },
                 {
                     path: '/statistics/transaction',
