@@ -61,12 +61,6 @@
                             <span class="goals-m-progress-pct">{{ progressPct(goal) }}%</span>
                         </div>
 
-                        <!-- Goal Reached badge -->
-                        <div v-if="isGoalReached(goal)" class="goals-m-reached-badge">
-                            <f7-icon f7="checkmark_seal_fill" size="14" />
-                            {{ tt('Goal Reached') }}
-                        </div>
-
                         <!-- Target & suggestion -->
                         <div class="goals-m-meta">
                             <div class="goals-m-meta-row">
@@ -578,16 +572,6 @@ function onPageAfterIn(): void {
     text-align: right;
     flex-shrink: 0;
     opacity: 0.6;
-}
-
-.goals-m-reached-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--f7-color-green);
-    margin-bottom: 8px;
 }
 
 .goals-m-meta {

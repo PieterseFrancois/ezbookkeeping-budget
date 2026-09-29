@@ -115,16 +115,6 @@
                         />
                     </div>
 
-                    <!-- Goal Reached badge -->
-                    <v-chip
-                        v-if="isGoalReached(goal)"
-                        color="success"
-                        size="small"
-                        variant="tonal"
-                        prepend-icon="mdi-trophy-outline"
-                        class="align-self-start mt-1"
-                    >{{ tt('Goal Reached') }}</v-chip>
-
                     <!-- Target date & suggested contribution -->
                     <div class="text-body-2 mt-1">
                         <div class="d-flex justify-space-between">
