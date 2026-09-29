@@ -190,6 +190,7 @@ import { ref, computed, useTemplateRef } from 'vue';
 import axios from 'axios';
 
 import { useI18n } from '@/locales/helpers.ts';
+import { parseBigDecimal } from '@/lib/numeral.ts';
 import { useUserStore } from '@/stores/user.ts';
 import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
@@ -385,18 +386,18 @@ function accountCoverage(subscription: Subscription, template: TransactionTempla
     }
 
     const neededInAccountCurrency = account.currency === subscription.currency
-        ? subscription.amount
-        : exchangeRatesStore.getExchangedAmount(subscription.amount, subscription.currency, account.currency);
+        ? parseBigDecimal(subscription.amount)
+        : exchangeRatesStore.getExchangedAmount(parseBigDecimal(subscription.amount), subscription.currency, account.currency);
 
     if (neededInAccountCurrency === null) {
         return undefined;
     }
 
     return {
-        covered: account.balance >= neededInAccountCurrency,
+        covered: parseBigDecimal(account.balance).greaterThanOrEqual(neededInAccountCurrency),
         accountName: account.name,
         accountBalanceDisplay: showAmountInSubscriptionsPage.value
-            ? formatAmountToLocalizedNumeralsWithCurrency(account.balance, account.currency)
+            ? formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(account.balance), account.currency)
             : formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, account.currency),
     };
 }
@@ -416,7 +417,7 @@ const headers = computed(() => [
 
 const tableItems = computed(() => subscriptions.value.map(subscription => {
     const convertedAmount = subscription.currency !== defaultCurrency.value
-        ? exchangeRatesStore.getExchangedAmount(subscription.amount, subscription.currency, defaultCurrency.value)
+        ? exchangeRatesStore.getExchangedAmount(parseBigDecimal(subscription.amount), subscription.currency, defaultCurrency.value)
         : null;
     const template = getTemplate(subscription.templateId);
     const category = categoryNamePartsFromTemplate(template);
@@ -426,12 +427,12 @@ const tableItems = computed(() => subscriptions.value.map(subscription => {
         id: subscription.id,
         name: subscription.name,
         amountDisplay: showAmountInSubscriptionsPage.value
-            ? formatAmountToLocalizedNumeralsWithCurrency(subscription.amount, subscription.currency)
+            ? formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(subscription.amount), subscription.currency)
             : formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, subscription.currency),
         convertedAmountDisplay: subscription.currency !== defaultCurrency.value
             ? (!showAmountInSubscriptionsPage.value
                 ? formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value)
-                : (convertedAmount !== null ? formatAmountToLocalizedNumeralsWithCurrency(Math.round(convertedAmount), defaultCurrency.value) : '-'))
+                : (convertedAmount !== null ? formatAmountToLocalizedNumeralsWithCurrency(convertedAmount, defaultCurrency.value) : '-'))
             : '',
         categoryName: [category.primaryName, category.subName].filter(Boolean).join(' '),
         primaryCategoryName: category.primaryName,

@@ -80,6 +80,7 @@ import { useI18n } from '@/locales/helpers.ts';
 import { useSettingsStore } from '@/stores/setting.ts';
 import { useUserStore } from '@/stores/user.ts';
 import { DISPLAY_HIDDEN_AMOUNT } from '@/consts/numeral.ts';
+import { parseBigDecimal } from '@/lib/numeral.ts';
 
 export interface BudgetSummaryItem {
     categoryName: string;
@@ -120,7 +121,7 @@ function displayAmount(amount: number): string {
         return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value);
     }
     const rands = Math.round(amount / 100) * 100;
-    return formatAmountToLocalizedNumeralsWithCurrency(rands, defaultCurrency.value)
+    return formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(rands), defaultCurrency.value)
         .replace(/[,.]00$/, '');
 }
 

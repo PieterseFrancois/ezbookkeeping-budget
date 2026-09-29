@@ -105,6 +105,7 @@
 import { ref, computed, useTemplateRef, onMounted } from 'vue';
 
 import { useI18n } from '@/locales/helpers.ts';
+import { parseBigDecimal } from '@/lib/numeral.ts';
 
 import ConfirmDialog from '@/components/desktop/ConfirmDialog.vue';
 import SnackBar from '@/components/desktop/SnackBar.vue';
@@ -178,7 +179,7 @@ function getDisplayAmount(draft: TransactionDraftInfoResponse): string {
     }
 
     const account = draft.accountId ? allAccountsMap.value[draft.accountId] : undefined;
-    return formatAmountToLocalizedNumeralsWithCurrency(draft.amount, account ? account.currency : defaultCurrency.value);
+    return formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(draft.amount), account ? account.currency : defaultCurrency.value);
 }
 
 function getCategory(draft: TransactionDraftInfoResponse): TransactionCategory | undefined {

@@ -120,7 +120,6 @@ import { useOverviewStore } from '@/stores/overview.ts';
 import { useUserStore } from '@/stores/user.ts';
 import { useTransactionDraftsStore } from '@/stores/transactionDraft.ts';
 
-import { DateRange } from '@/core/datetime.ts';
 import { CategoryType } from '@/core/category.ts';
 import {
     type MobileOverviewLayout,

@@ -178,6 +178,7 @@ import { ref, computed } from 'vue';
 import axios from 'axios';
 
 import { useI18n } from '@/locales/helpers.ts';
+import { parseBigDecimal } from '@/lib/numeral.ts';
 import { useI18nUIComponents } from '@/lib/ui/mobile.ts';
 import { useAccountsStore } from '@/stores/account.ts';
 import { useUserStore } from '@/stores/user.ts';
@@ -266,7 +267,7 @@ function accountName(accountId: string): string {
 }
 
 function accountBalance(accountId: string): number {
-    return accountsStore.allPlainAccounts.find(a => a.id === accountId)?.balance ?? 0;
+    return Number(accountsStore.allPlainAccounts.find(a => a.id === accountId)?.balance ?? 0);
 }
 
 function accountCurrency(accountId: string): string {
@@ -294,7 +295,7 @@ function fmtAmount(cents: number): string {
     if (!showAmountInGoalsPage.value) {
         return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value);
     }
-    return formatAmountToLocalizedNumeralsWithCurrency(cents, defaultCurrency.value)
+    return formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(cents), defaultCurrency.value)
         .replace(/[,.]00$/, '');
 }
 
@@ -304,7 +305,7 @@ function fmtBalance(goal: Goal): string {
     if (!showAmountInGoalsPage.value) {
         return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, cur);
     }
-    return formatAmountToLocalizedNumeralsWithCurrency(bal, cur).replace(/[,.]00$/, '');
+    return formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(bal), cur).replace(/[,.]00$/, '');
 }
 
 function fmtTargetDate(unixTs: number): string {
@@ -379,7 +380,7 @@ function openEditPopup(goal: Goal): void {
     form.value = {
         name: goal.name,
         accountId: goal.accountId,
-        targetAmountRaw: formatAmountToLocalizedNumeralsWithoutDigitGrouping(goal.targetAmount, defaultCurrency.value),
+        targetAmountRaw: formatAmountToLocalizedNumeralsWithoutDigitGrouping(parseBigDecimal(goal.targetAmount), defaultCurrency.value),
         targetYear: d.getFullYear(),
         targetMonth: d.getMonth() + 1,
     };

@@ -191,6 +191,7 @@ import { ref, computed, useTemplateRef } from 'vue';
 import axios from 'axios';
 
 import { useI18n } from '@/locales/helpers.ts';
+import { parseBigDecimal } from '@/lib/numeral.ts';
 import { useAccountsStore } from '@/stores/account.ts';
 import { useUserStore } from '@/stores/user.ts';
 import { useSettingsStore } from '@/stores/setting.ts';
@@ -287,7 +288,7 @@ function accountName(accountId: string): string {
 }
 
 function accountBalance(accountId: string): number {
-    return accountsStore.allPlainAccounts.find(a => a.id === accountId)?.balance ?? 0;
+    return Number(accountsStore.allPlainAccounts.find(a => a.id === accountId)?.balance ?? 0);
 }
 
 function accountCurrency(accountId: string): string {
@@ -315,7 +316,7 @@ function fmtAmount(cents: number): string {
     if (!showAmountInGoalsPage.value) {
         return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value);
     }
-    return formatAmountToLocalizedNumeralsWithCurrency(cents, defaultCurrency.value)
+    return formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(cents), defaultCurrency.value)
         .replace(/[,.]00$/, '');
 }
 
@@ -325,7 +326,7 @@ function fmtBalance(goal: Goal): string {
     if (!showAmountInGoalsPage.value) {
         return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, cur);
     }
-    return formatAmountToLocalizedNumeralsWithCurrency(bal, cur).replace(/[,.]00$/, '');
+    return formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(bal), cur).replace(/[,.]00$/, '');
 }
 
 function fmtTargetDate(unixTs: number): string {

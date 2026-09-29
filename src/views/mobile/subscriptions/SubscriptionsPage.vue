@@ -192,6 +192,7 @@ import { ref, computed } from 'vue';
 import axios from 'axios';
 
 import { useI18n } from '@/locales/helpers.ts';
+import { parseBigDecimal } from '@/lib/numeral.ts';
 import { useI18nUIComponents } from '@/lib/ui/mobile.ts';
 import { useUserStore } from '@/stores/user.ts';
 import { useAccountsStore } from '@/stores/account.ts';
@@ -372,21 +373,21 @@ function accountCoverage(subscription: Subscription, template: TransactionTempla
     }
 
     const neededInAccountCurrency = account.currency === subscription.currency
-        ? subscription.amount
-        : exchangeRatesStore.getExchangedAmount(subscription.amount, subscription.currency, account.currency);
+        ? parseBigDecimal(subscription.amount)
+        : exchangeRatesStore.getExchangedAmount(parseBigDecimal(subscription.amount), subscription.currency, account.currency);
 
     if (neededInAccountCurrency === null) {
         return undefined;
     }
 
-    return { covered: account.balance >= neededInAccountCurrency, accountName: account.name };
+    return { covered: parseBigDecimal(account.balance).greaterThanOrEqual(neededInAccountCurrency), accountName: account.name };
 }
 
 // ── List items ─────────────────────────────────────────────
 
 const tableItems = computed(() => subscriptions.value.map(subscription => {
     const convertedAmount = subscription.currency !== defaultCurrency.value
-        ? exchangeRatesStore.getExchangedAmount(subscription.amount, subscription.currency, defaultCurrency.value)
+        ? exchangeRatesStore.getExchangedAmount(parseBigDecimal(subscription.amount), subscription.currency, defaultCurrency.value)
         : null;
     const template = getTemplate(subscription.templateId);
 
@@ -395,11 +396,11 @@ const tableItems = computed(() => subscriptions.value.map(subscription => {
         id: subscription.id,
         name: subscription.name,
         amountDisplay: showAmountInSubscriptionsPage.value
-            ? formatAmountToLocalizedNumeralsWithCurrency(subscription.amount, subscription.currency)
+            ? formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(subscription.amount), subscription.currency)
             : formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, subscription.currency),
         convertedAmountDisplay: subscription.currency !== defaultCurrency.value && convertedAmount !== null
             ? (showAmountInSubscriptionsPage.value
-                ? formatAmountToLocalizedNumeralsWithCurrency(Math.round(convertedAmount), defaultCurrency.value)
+                ? formatAmountToLocalizedNumeralsWithCurrency(convertedAmount, defaultCurrency.value)
                 : formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value))
             : '',
         categoryName: categoryNameFromTemplate(template),
@@ -423,7 +424,7 @@ function openEditPopup(subscription: Subscription): void {
     editingSubscription.value = subscription;
     form.value = {
         name: subscription.name,
-        amountRaw: formatAmountToLocalizedNumeralsWithoutDigitGrouping(subscription.amount, subscription.currency),
+        amountRaw: formatAmountToLocalizedNumeralsWithoutDigitGrouping(parseBigDecimal(subscription.amount), subscription.currency),
         currency: subscription.currency,
         templateId: subscription.templateId,
         startDate: parseDateTimeFromUnixTime(subscription.startDate).getGregorianCalendarYearDashMonthDashDay(),

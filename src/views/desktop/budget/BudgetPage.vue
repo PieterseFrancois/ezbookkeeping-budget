@@ -779,6 +779,7 @@ import BudgetHelpDialog from '@/views/desktop/budget/BudgetHelpDialog.vue';
 import { ref, computed, watch, nextTick, useTemplateRef } from 'vue';
 
 import { useI18n } from '@/locales/helpers.ts';
+import { parseBigDecimal } from '@/lib/numeral.ts';
 import { useBudgetPageBase, type CopyDecision, type BudgetSection, addMonths } from '@/views/base/BudgetPageBase.ts';
 
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
@@ -1077,7 +1078,7 @@ function fmt(amount: number): string {
         return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value);
     }
     const rands = Math.round(amount / 100) * 100;
-    return formatAmountToLocalizedNumeralsWithCurrency(rands, defaultCurrency.value)
+    return formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(rands), defaultCurrency.value)
         .replace(/[,.]00$/, '');
 }
 
@@ -1085,7 +1086,7 @@ function fmtCurrency(amount: number, currency: string): string {
     if (!showAmountInBudgetPage.value) {
         return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, currency);
     }
-    return formatAmountToLocalizedNumeralsWithCurrency(amount, currency);
+    return formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(amount), currency);
 }
 
 function diffClass(diff: number): string {
@@ -1450,7 +1451,7 @@ function isEditing(subcatId: string, col: { year: number; month: number }, secti
 
 function startEdit(subcatId: string, col: { year: number; month: number }, section?: BudgetSection): void {
     const resolved = section ?? sectionForCategory(subcatId);
-    editingText.value = formatAmountToLocalizedNumerals(getTargetAmount(subcatId, resolved, col.year, col.month));
+    editingText.value = formatAmountToLocalizedNumerals(parseBigDecimal(getTargetAmount(subcatId, resolved, col.year, col.month)));
     editingCell.value = { categoryId: subcatId, section: resolved, year: col.year, month: col.month };
 }
 

@@ -624,6 +624,7 @@ import BudgetHelpPopup from '@/views/mobile/budget/BudgetHelpPopup.vue';
 import { ref, computed, watch } from 'vue';
 
 import { useI18n } from '@/locales/helpers.ts';
+import { parseBigDecimal } from '@/lib/numeral.ts';
 import { useI18nUIComponents } from '@/lib/ui/mobile.ts';
 import { useBudgetPageBase, type CopyDecision, type BudgetSection, addMonths } from '@/views/base/BudgetPageBase.ts';
 
@@ -911,7 +912,7 @@ function fmt(amount: number): string {
         return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, defaultCurrency.value);
     }
     const rands = Math.round(amount / 100) * 100;
-    return formatAmountToLocalizedNumeralsWithCurrency(rands, defaultCurrency.value)
+    return formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(rands), defaultCurrency.value)
         .replace(/[,.]00$/, '');
 }
 
@@ -919,7 +920,7 @@ function fmtCurrency(amount: number, currency: string): string {
     if (!showAmountInBudgetPage.value) {
         return formatAmountToLocalizedNumeralsWithCurrency(DISPLAY_HIDDEN_AMOUNT, currency);
     }
-    return formatAmountToLocalizedNumeralsWithCurrency(amount, currency);
+    return formatAmountToLocalizedNumeralsWithCurrency(parseBigDecimal(amount), currency);
 }
 
 function diffClass(diff: number): string {
