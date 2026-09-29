@@ -19,4 +19,5 @@ const (
 	UUID_TYPE_BUDGET       UuidType = 11
 	UUID_TYPE_GOAL         UuidType = 12
 	UUID_TYPE_SUBSCRIPTION UuidType = 13
+	UUID_TYPE_CUSTOM_ICON  UuidType = 14
 )

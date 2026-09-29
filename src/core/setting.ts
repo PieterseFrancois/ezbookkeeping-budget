@@ -3,7 +3,9 @@ import { TimezoneTypeForStatistics } from './timezone.ts';
 import { CurrencySortingType } from './currency.ts';
 import { KeywordMatchMode } from './text.ts';
 import { ImageUploadQualityType } from './image.ts';
+import { CreditCardAmountDisplayType } from './account.ts';
 import {
+    TransactionAmountType,
     TransactionQuickSaveButtonStyle,
     TransactionQuickAddButtonActionType
 } from './transaction.ts';
@@ -32,26 +34,29 @@ export interface BaseApplicationSetting {
 export interface ApplicationSettings extends BaseApplicationSetting {
     // Debug Settings
     debug: boolean;
-    // Basic Settings
+    // General Settings
     theme: string;
     fontSize: number;
     timeZone: string;
     autoUpdateExchangeRatesData: boolean;
     showAccountBalance: boolean;
+    accountCategoryOrders: string;
+    chartColors: string;
     swipeBack: boolean;
     animate: boolean;
     // Application Lock
     applicationLock: boolean;
     applicationLockWebAuthn: boolean;
-    // General Settings
-    chartColors: string;
     // Navigation Bar
     showAddTransactionButtonInDesktopNavbar: boolean;
     // Overview Page
+    desktopOverviewPageLayout: string;
+    mobileOverviewPageLayout: string;
     showAmountInHomePage: boolean;
     timezoneUsedForStatisticsInHomePage: number;
     overviewAccountFilterInHomePage: Record<string, boolean>;
     overviewTransactionCategoryFilterInHomePage: Record<string, boolean>;
+    overviewTransactionTagFilterInHomePage: string;
     // Budget Page
     showAmountInBudgetPage: boolean;
     // Goals Page
@@ -63,6 +68,7 @@ export interface ApplicationSettings extends BaseApplicationSetting {
     quickAddButtonActionInMobileTransactionEditPage: number;
     itemsCountInTransactionListPage: number;
     showTotalAmountInTransactionListPage: boolean;
+    totalAmountTypeInTransactionListPage: number;
     showTagInTransactionListPage: boolean;
     defaultKeywordMatchModeInTransactionListPage: number;
     // Transaction Edit Page
@@ -82,8 +88,8 @@ export interface ApplicationSettings extends BaseApplicationSetting {
     showTagInInsightsExplorerPage: boolean;
     // Account List Page
     totalAmountExcludeAccountIds: Record<string, boolean>;
-    accountCategoryOrders: string;
     hideCategoriesWithoutAccounts: boolean;
+    defaultCreditCardAmountDisplayTypeInMobile: number;
     reconciliationStatementButtonDefaultDateRangeTypeInDesktop: number;
     reconciliationStatementPageDefaultDateRangeTypeInMobile: number;
     // Exchange Rates Data Page
@@ -135,18 +141,21 @@ export interface WebAuthnConfig {
 }
 
 export const ALL_ALLOWED_CLOUD_SYNC_APP_SETTING_KEY_TYPES: Record<string, UserApplicationCloudSettingType> = {
-    // Basic Settings
-    'showAccountBalance': UserApplicationCloudSettingType.Boolean,
-    'autoUpdateExchangeRatesData': UserApplicationCloudSettingType.Boolean,
     // General Settings
+    'showAccountBalance': UserApplicationCloudSettingType.Boolean,
+    'accountCategoryOrders': UserApplicationCloudSettingType.String,
+    'autoUpdateExchangeRatesData': UserApplicationCloudSettingType.Boolean,
     'chartColors': UserApplicationCloudSettingType.String,
     // Navigation Bar
     'showAddTransactionButtonInDesktopNavbar': UserApplicationCloudSettingType.Boolean,
     // Overview Page
+    'desktopOverviewPageLayout': UserApplicationCloudSettingType.String,
+    'mobileOverviewPageLayout': UserApplicationCloudSettingType.String,
     'showAmountInHomePage': UserApplicationCloudSettingType.Boolean,
     'timezoneUsedForStatisticsInHomePage': UserApplicationCloudSettingType.Number,
     'overviewAccountFilterInHomePage': UserApplicationCloudSettingType.StringBooleanMap,
     'overviewTransactionCategoryFilterInHomePage': UserApplicationCloudSettingType.StringBooleanMap,
+    'overviewTransactionTagFilterInHomePage': UserApplicationCloudSettingType.String,
     // Budget Page
     'showAmountInBudgetPage': UserApplicationCloudSettingType.Boolean,
     // Goals Page
@@ -156,6 +165,7 @@ export const ALL_ALLOWED_CLOUD_SYNC_APP_SETTING_KEY_TYPES: Record<string, UserAp
     // Transaction List Page
     'itemsCountInTransactionListPage': UserApplicationCloudSettingType.Number,
     'showTotalAmountInTransactionListPage': UserApplicationCloudSettingType.Boolean,
+    'totalAmountTypeInTransactionListPage': UserApplicationCloudSettingType.Number,
     'showTagInTransactionListPage': UserApplicationCloudSettingType.Boolean,
     'defaultKeywordMatchModeInTransactionListPage': UserApplicationCloudSettingType.Number,
     // Transaction Edit Page
@@ -177,8 +187,8 @@ export const ALL_ALLOWED_CLOUD_SYNC_APP_SETTING_KEY_TYPES: Record<string, UserAp
     'showTagInInsightsExplorerPage': UserApplicationCloudSettingType.Boolean,
     // Account List Page
     'totalAmountExcludeAccountIds': UserApplicationCloudSettingType.StringBooleanMap,
-    'accountCategoryOrders': UserApplicationCloudSettingType.String,
     'hideCategoriesWithoutAccounts': UserApplicationCloudSettingType.Boolean,
+    'defaultCreditCardAmountDisplayTypeInMobile': UserApplicationCloudSettingType.Number,
     'reconciliationStatementButtonDefaultDateRangeTypeInDesktop': UserApplicationCloudSettingType.Number,
     'reconciliationStatementPageDefaultDateRangeTypeInMobile': UserApplicationCloudSettingType.Number,
     // Exchange Rates Data Page
@@ -204,26 +214,29 @@ export const ALL_ALLOWED_CLOUD_SYNC_APP_SETTING_KEY_TYPES: Record<string, UserAp
 export const DEFAULT_APPLICATION_SETTINGS: ApplicationSettings = {
     // Debug Settings
     debug: false,
-    // Basic Settings
+    // General Settings
     theme: 'auto',
     fontSize: 1,
     timeZone: '',
     autoUpdateExchangeRatesData: true,
     showAccountBalance: true,
+    accountCategoryOrders: '',
+    chartColors: '',
     swipeBack: true,
     animate: true,
     // Application Lock
     applicationLock: false,
     applicationLockWebAuthn: false,
-    // General Settings
-    chartColors: '',
     // Navigation Bar
     showAddTransactionButtonInDesktopNavbar: true,
     // Overview Page
+    desktopOverviewPageLayout: '',
+    mobileOverviewPageLayout: '',
     showAmountInHomePage: true,
     timezoneUsedForStatisticsInHomePage: TimezoneTypeForStatistics.Default.type,
     overviewAccountFilterInHomePage: {},
     overviewTransactionCategoryFilterInHomePage: {},
+    overviewTransactionTagFilterInHomePage: '',
     // Budget Page
     showAmountInBudgetPage: true,
     // Goals Page
@@ -233,6 +246,7 @@ export const DEFAULT_APPLICATION_SETTINGS: ApplicationSettings = {
     // Transaction List Page
     itemsCountInTransactionListPage: 15,
     showTotalAmountInTransactionListPage: true,
+    totalAmountTypeInTransactionListPage: TransactionAmountType.InflowsAndOutflows,
     showTagInTransactionListPage: true,
     defaultKeywordMatchModeInTransactionListPage: KeywordMatchMode.Default.type,
     // Transaction Edit Page
@@ -254,8 +268,8 @@ export const DEFAULT_APPLICATION_SETTINGS: ApplicationSettings = {
     showTagInInsightsExplorerPage: true,
     // Account List Page
     totalAmountExcludeAccountIds: {},
-    accountCategoryOrders: '',
     hideCategoriesWithoutAccounts: false,
+    defaultCreditCardAmountDisplayTypeInMobile: CreditCardAmountDisplayType.Default.type,
     reconciliationStatementButtonDefaultDateRangeTypeInDesktop: DEFAULT_RECONCILIATION_STATEMENT_DATE_RANGE_IN_DESKTOP.type,
     reconciliationStatementPageDefaultDateRangeTypeInMobile: DEFAULT_RECONCILIATION_STATEMENT_DATE_RANGE_IN_MOBILE.type,
     // Exchange Rates Data Page

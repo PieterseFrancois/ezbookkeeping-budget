@@ -13,13 +13,19 @@
         "RasterCrow",
         "vjsai",
         "dibuyo",
-        "rhierlmeier"
+        "rhierlmeier",
+        "LudwigJMarx",
+        "quentinmarois"
     ],
     "translators": {
         "de": [
             "chrgm",
             "1270o1",
-            "martinschilliger"
+            "martinschilliger",
+            "marcelweikum"
+        ],
+        "el": [
+            "konet-gr"
         ],
         "en": [],
         "es": [
@@ -32,7 +38,8 @@
             "brieucdlf"
         ],
         "it": [
-            "waron97"
+            "waron97",
+            "albanobattistella"
         ],
         "ja": [
             "tkymmm",
@@ -48,6 +55,9 @@
         "nl": [
             "automagics"
         ],
+        "pl": [
+            "mnowok"
+        ],
         "pt-BR": [
             "thecodergus",
             "balaios"
@@ -57,7 +67,8 @@
         ],
         "ru": [
             "artegoser",
-            "dshemin"
+            "dshemin",
+            "zhugaru"
         ],
         "sl": [
             "thehijacker"

@@ -76,8 +76,8 @@ type TransactionTemplateCreateRequest struct {
 	CategoryId                 int64                             `json:"categoryId,string" binding:"required,min=1"`
 	SourceAccountId            int64                             `json:"sourceAccountId,string" binding:"required,min=1"`
 	DestinationAccountId       int64                             `json:"destinationAccountId,string" binding:"min=0"`
-	SourceAmount               int64                             `json:"sourceAmount" binding:"min=-9999999999999,max=9999999999999"`
-	DestinationAmount          int64                             `json:"destinationAmount" binding:"min=-9999999999999,max=9999999999999"`
+	SourceAmount               int64                             `json:"sourceAmount" binding:"validTransactionAmount"`
+	DestinationAmount          int64                             `json:"destinationAmount" binding:"validTransactionAmount"`
 	HideAmount                 bool                              `json:"hideAmount"`
 	TagIds                     []string                          `json:"tagIds"`
 	Comment                    string                            `json:"comment" binding:"max=255"`
@@ -103,8 +103,8 @@ type TransactionTemplateModifyRequest struct {
 	CategoryId                 int64                             `json:"categoryId,string" binding:"required,min=1"`
 	SourceAccountId            int64                             `json:"sourceAccountId,string" binding:"required,min=1"`
 	DestinationAccountId       int64                             `json:"destinationAccountId,string" binding:"min=0"`
-	SourceAmount               int64                             `json:"sourceAmount" binding:"min=-9999999999999,max=9999999999999"`
-	DestinationAmount          int64                             `json:"destinationAmount" binding:"min=-9999999999999,max=9999999999999"`
+	SourceAmount               int64                             `json:"sourceAmount" binding:"validTransactionAmount"`
+	DestinationAmount          int64                             `json:"destinationAmount" binding:"validTransactionAmount"`
 	HideAmount                 bool                              `json:"hideAmount"`
 	TagIds                     []string                          `json:"tagIds"`
 	Comment                    string                            `json:"comment" binding:"max=255"`
@@ -207,6 +207,12 @@ func (t *TransactionTemplate) toTransactionInfoResponse(utcOffset int16) *Transa
 		tagIds = strings.Split(t.TagIds, ",")
 	}
 
+	var destinationAmount *int64
+
+	if t.Type == TRANSACTION_TYPE_TRANSFER {
+		destinationAmount = &t.RelatedAccountAmount
+	}
+
 	return &TransactionInfoResponse{
 		Id:                   t.TemplateId,
 		TimeSequenceId:       utils.GetMinTransactionTimeFromUnixTime(t.CreatedUnixTime),
@@ -217,7 +223,7 @@ func (t *TransactionTemplate) toTransactionInfoResponse(utcOffset int16) *Transa
 		SourceAccountId:      t.AccountId,
 		DestinationAccountId: t.RelatedAccountId,
 		SourceAmount:         t.Amount,
-		DestinationAmount:    t.RelatedAccountAmount,
+		DestinationAmount:    destinationAmount,
 		HideAmount:           t.HideAmount,
 		TagIds:               tagIds,
 		Comment:              t.Comment,

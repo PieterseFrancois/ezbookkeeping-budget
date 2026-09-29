@@ -49,6 +49,7 @@ const (
 	NormalSubcategoryGoal                   = 21
 	NormalSubcategorySubscription           = 22
 	NormalSubcategoryTransactionDraft       = 23
+	NormalSubcategoryUserCustomIcon         = 24
 )
 
 // Error represents the specific error returned to user

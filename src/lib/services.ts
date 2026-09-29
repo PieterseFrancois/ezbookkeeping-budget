@@ -91,7 +91,9 @@ import type {
     TransactionStatisticAssetTrendsResponseItem,
     TransactionAmountsRequestParams,
     TransactionAmountsResponse,
-    TransactionBudgetOverrideSetRequest
+    TransactionBudgetOverrideSetRequest,
+    TransactionDailyAmountsRequest,
+    TransactionDailyAmountsResponseItem
 } from '@/models/transaction.ts';
 import {
     TransactionAmountsRequest
@@ -188,8 +190,15 @@ import type {
     UserApplicationCloudSettingsUpdateRequest
 } from '@/models/user_app_cloud_setting.ts';
 import type {
-    RecognizedTransactionResponse
+    RecognizedTransactionResponse,
+    CodingAssistantRequest,
+    CodingAssistantResponse
 } from '@/models/large_language_model.ts';
+import type {
+    UserCustomIconInfoResponse,
+    UserCustomIconMoveRequest,
+    UserCustomIconDeleteRequest
+} from '@/models/user_custom_icon.ts';
 
 import {
     getCurrentToken,
@@ -614,7 +623,7 @@ export default {
 
         return axios.get<ApiResponse<TransactionStatisticAssetTrendsResponseItem[]>>('v1/transactions/statistics/asset_trends.json' + (queryParams.length ? '?' + queryParams.join('&') : ''));
     },
-    getTransactionAmounts: (params: TransactionAmountsRequestParams, excludeAccountIds: string[], excludeCategoryIds: string[]): ApiResponsePromise<TransactionAmountsResponse> => {
+    getTransactionAmounts: (params: TransactionAmountsRequestParams, excludeAccountIds: string[], excludeCategoryIds: string[], tagFilter: string): ApiResponsePromise<TransactionAmountsResponse> => {
         const req = TransactionAmountsRequest.of(params);
         let queryParams = req.buildQuery();
 
@@ -626,7 +635,32 @@ export default {
             queryParams = queryParams + `&exclude_category_ids=${excludeCategoryIds.join(',')}`;
         }
 
+        if (tagFilter) {
+            queryParams = queryParams + `&tag_filter=${encodeURIComponent(tagFilter)}`;
+        }
+
         return axios.get<ApiResponse<TransactionAmountsResponse>>(`v1/transactions/amounts.json?${queryParams}`);
+    },
+    getTransactionDailyAmounts: (req: TransactionDailyAmountsRequest): ApiResponsePromise<TransactionDailyAmountsResponseItem[]> => {
+        const queryParams: string[] = [
+            `start_time=${req.startTime}`,
+            `end_time=${req.endTime}`,
+            `use_transaction_timezone=${req.useTransactionTimezone}`
+        ];
+
+        if (req.excludeAccountIds.length) {
+            queryParams.push(`exclude_account_ids=${req.excludeAccountIds.join(',')}`);
+        }
+
+        if (req.excludeCategoryIds.length) {
+            queryParams.push(`exclude_category_ids=${req.excludeCategoryIds.join(',')}`);
+        }
+
+        if (req.tagFilter) {
+            queryParams.push(`tag_filter=${encodeURIComponent(req.tagFilter)}`);
+        }
+
+        return axios.get<ApiResponse<TransactionDailyAmountsResponseItem[]>>(`v1/transactions/amounts/daily.json?${queryParams.join('&')}`);
     },
     getTransaction: ({ id, withPictures }: { id: string, withPictures: boolean | undefined }): ApiResponsePromise<TransactionInfoResponse> => {
         if (!isDefined(withPictures)) {
@@ -903,6 +937,29 @@ export default {
             cancelableUuid: cancelableUuid
         } as ApiRequestConfig);
     },
+    generateCode: (req: CodingAssistantRequest, cancelableUuid?: string): ApiResponsePromise<CodingAssistantResponse> => {
+        return axios.post<ApiResponse<CodingAssistantResponse>>('v1/llm/code/generate.json', req, {
+            timeout: DEFAULT_LLM_API_TIMEOUT,
+            cancelableUuid: cancelableUuid
+        } as ApiRequestConfig);
+    },
+    getAllUserCustomIcons: (): ApiResponsePromise<UserCustomIconInfoResponse[]> => {
+        return axios.get<ApiResponse<UserCustomIconInfoResponse[]>>('v1/custom_icons/list.json');
+    },
+    uploadUserCustomIcon: ({ iconFile, clientSessionId }: { iconFile: File, clientSessionId?: string }): ApiResponsePromise<UserCustomIconInfoResponse> => {
+        return axios.postForm<ApiResponse<UserCustomIconInfoResponse>>('v1/custom_icons/upload.json', {
+            icon: iconFile,
+            clientSessionId: clientSessionId
+        }, {
+            timeout: DEFAULT_UPLOAD_API_TIMEOUT
+        } as ApiRequestConfig);
+    },
+    moveUserCustomIcons: (req: UserCustomIconMoveRequest): ApiResponsePromise<boolean> => {
+        return axios.post<ApiResponse<boolean>>('v1/custom_icons/move.json', req);
+    },
+    deleteUserCustomIcon: (req: UserCustomIconDeleteRequest): ApiResponsePromise<boolean> => {
+        return axios.post<ApiResponse<boolean>>('v1/custom_icons/delete.json', req);
+    },
     getLatestExchangeRates: (param: { ignoreError?: boolean }): ApiResponsePromise<LatestExchangeRateResponse> => {
         return axios.get<ApiResponse<LatestExchangeRateResponse>>('v1/exchange_rates/latest.json', {
             ignoreError: !!param.ignoreError,
@@ -995,6 +1052,9 @@ export default {
         } else {
             return avatarUrl + '?' + params.join('&');
         }
+    },
+    getUserCustomIconUrlWithToken(iconId: string | number): string {
+        return `${getBasePath()}/icons/${iconId}.png?token=${getCurrentToken()}`;
     },
     getTransactionPictureUrlWithToken(pictureUrl: string, disableBrowserCache?: boolean | string): string {
         if (!pictureUrl) {
