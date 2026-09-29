@@ -1,33 +1,66 @@
 ﻿<template>
-    <v-row class="match-height">
-        <v-col cols="12" class="d-flex align-center pb-2">
-            <h5 class="text-h5">{{ tt('Transaction Drafts') }}</h5>
-            <v-btn density="compact" color="default" variant="text" size="24"
-                   class="ms-2" :icon="true">
-                <v-icon :icon="mdiHelpCircleOutline" size="20" />
-                <v-tooltip activator="parent">{{ tt('A draft can be saved without a category or account, and reviewed and confirmed later.') }}</v-tooltip>
-            </v-btn>
-            <v-spacer />
-            <v-btn density="compact" color="default" variant="text" size="24"
-                   class="me-2" :icon="true" :loading="loading" @click="reload">
-                <template #loader>
-                    <v-progress-circular indeterminate size="20"/>
-                </template>
-                <v-icon :icon="mdiRefresh" size="24" />
-                <v-tooltip activator="parent">{{ tt('Refresh') }}</v-tooltip>
-            </v-btn>
-        </v-col>
+    <main-page-layout>
+        <template #nav-items>
+            <div class="my-2">
+                <span class="mx-3 text-body-medium">{{ tt('Transaction Type') }}</span>
+                <v-select
+                    item-title="displayName"
+                    item-value="type"
+                    class="mt-1"
+                    density="compact"
+                    :disabled="loading"
+                    :items="[
+                        { displayName: tt('All Types'), type: 0 },
+                        { displayName: tt('Modify Balance'), type: 1 },
+                        { displayName: tt('Income'), type: 2 },
+                        { displayName: tt('Expense'), type: 3 },
+                        { displayName: tt('Transfer'), type: 4 }
+                    ]"
+                    v-model="queryType"
+                />
+            </div>
+            <div class="my-2">
+                <span class="mx-3 text-body-medium">{{ tt('Drafts Per Page') }}</span>
+                <v-select class="mt-1" density="compact"
+                          item-title="name"
+                          item-value="value"
+                          :disabled="loading"
+                          :items="allPageCounts"
+                          v-model="pageSize"
+                />
+            </div>
+        </template>
 
-        <v-col cols="12">
-            <v-card>
-                <v-table class="draft-table" :hover="!loading">
+        <template #content>
+            <v-card min-height="920">
+                <template #title>
+                    <div class="title-and-toolbar d-flex align-center text-no-wrap">
+                        <span>{{ tt('Transaction Drafts') }}</span>
+                        <v-btn density="compact" color="default" variant="text" size="24"
+                               class="ms-2" :icon="true">
+                            <v-icon :icon="mdiHelpCircleOutline" size="20" />
+                            <v-tooltip activator="parent">{{ tt('A draft can be saved without a category or account, and reviewed and confirmed later.') }}</v-tooltip>
+                        </v-btn>
+                        <v-btn density="compact" color="default" variant="text" class="ms-2"
+                               :aria-label="tt('Refresh')" :icon="true" :loading="loading" @click="reload">
+                            <template #loader>
+                                <v-progress-circular indeterminate size="20"/>
+                            </template>
+                            <v-icon :icon="mdiRefresh" size="24" />
+                            <v-tooltip activator="parent">{{ tt('Refresh') }}</v-tooltip>
+                        </v-btn>
+                        <v-spacer/>
+                    </div>
+                </template>
+
+                <v-table class="transaction-table draft-table" :hover="!loading">
                     <thead>
                     <tr>
-                        <th>{{ tt('Time') }}</th>
-                        <th>{{ tt('Type') }}</th>
-                        <th>{{ tt('Amount') }}</th>
-                        <th>{{ tt('Category') }}</th>
-                        <th>{{ tt('Account') }}</th>
+                        <th class="transaction-table-column-time text-no-wrap">{{ tt('Time') }}</th>
+                        <th class="text-no-wrap">{{ tt('Type') }}</th>
+                        <th class="transaction-table-column-amount text-no-wrap">{{ tt('Amount') }}</th>
+                        <th class="transaction-table-column-category text-no-wrap">{{ tt('Category') }}</th>
+                        <th class="transaction-table-column-account text-no-wrap">{{ tt('Account') }}</th>
                         <th>{{ tt('Description') }}</th>
                         <th></th>
                     </tr>
@@ -37,12 +70,12 @@
                             <td colspan="7"><v-skeleton-loader type="text" :loading="true"></v-skeleton-loader></td>
                         </tr>
                     </tbody>
-                    <tbody v-if="!loading && !drafts.length">
+                    <tbody v-if="!loading && !filteredDrafts.length">
                         <tr>
                             <td colspan="7">{{ tt('No transaction drafts') }}</td>
                         </tr>
                     </tbody>
-                    <tbody :key="draft.id" :class="{ 'disabled': loading }" v-for="draft in drafts">
+                    <tbody :key="draft.id" :class="{ 'disabled': loading }" v-for="draft in filteredDrafts">
                         <tr class="draft-row" :class="{ 'draft-row-incomplete': !draft.complete }" @click="openTransactionEditDialog(draft)">
                             <td>{{ getDisplayTime(draft) }}</td>
                             <td>{{ getTransactionTypeName(draft.type) }}</td>
@@ -93,8 +126,8 @@
                     <v-btn density="compact" variant="tonal" :disabled="loading || !hasNextPage" @click="changePage(currentPage + 1)">{{ tt('Next') }}</v-btn>
                 </div>
             </v-card>
-        </v-col>
-    </v-row>
+        </template>
+    </main-page-layout>
 
     <edit-dialog ref="transactionEditDialog" :type="TransactionEditPageType.Transaction" />
     <confirm-dialog ref="confirmDialog"/>
@@ -102,10 +135,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, useTemplateRef, onMounted } from 'vue';
+import { ref, computed, watch, useTemplateRef, onMounted } from 'vue';
 
 import { useI18n } from '@/locales/helpers.ts';
 import { parseBigDecimal } from '@/lib/numeral.ts';
+import { DEFAULT_PAGE_COUNTS } from '@/consts/page.ts';
+import type { NameNumeralValue } from '@/core/base.ts';
 
 import ConfirmDialog from '@/components/desktop/ConfirmDialog.vue';
 import SnackBar from '@/components/desktop/SnackBar.vue';
@@ -135,7 +170,8 @@ const {
     tt,
     formatNumberToLocalizedNumerals,
     formatAmountToLocalizedNumeralsWithCurrency,
-    formatDateTimeToLongDateTime
+    formatDateTimeToLongDateTime,
+    getTablePageOptions
 } = useI18n();
 
 const accountsStore = useAccountsStore();
@@ -149,13 +185,16 @@ const snackbar = useTemplateRef<SnackBarType>('snackbar');
 const loading = ref<boolean>(true);
 const drafts = ref<TransactionDraftInfoResponse[]>([]);
 const currentPage = ref<number>(1);
-const pageSize = 20;
+const pageSize = ref<number>(20);
 const hasNextPage = ref<boolean>(false);
 const processingSource = ref<string>('');
+const queryType = ref<number>(0);
 
 const defaultCurrency = computed<string>(() => accountsStore.allPlainAccounts[0]?.currency ?? 'USD');
 const allAccountsMap = computed<Record<string, Account>>(() => accountsStore.allAccountsMap);
 const allCategoriesMap = computed<Record<string, TransactionCategory>>(() => transactionCategoriesStore.allTransactionCategoriesMap);
+const allPageCounts = computed<NameNumeralValue[]>(() => getTablePageOptions(DEFAULT_PAGE_COUNTS, undefined, false, true));
+const filteredDrafts = computed<TransactionDraftInfoResponse[]>(() => queryType.value ? drafts.value.filter(draft => draft.type === queryType.value) : drafts.value);
 
 function getTransactionTypeName(type: number): string {
     if (type === TransactionType.Income) {
@@ -229,7 +268,7 @@ function changePage(page: number): void {
 function loadDrafts(page: number): void {
     loading.value = true;
 
-    services.listTransactionDrafts({ page: page - 1, count: pageSize }).then(response => {
+    services.listTransactionDrafts({ page: page - 1, count: pageSize.value }).then(response => {
         loading.value = false;
 
         if (!response.data || !response.data.success || !response.data.result) {
@@ -239,7 +278,7 @@ function loadDrafts(page: number): void {
 
         drafts.value = response.data.result;
         currentPage.value = page;
-        hasNextPage.value = response.data.result.length >= pageSize;
+        hasNextPage.value = response.data.result.length >= pageSize.value;
     }).catch(error => {
         loading.value = false;
 
@@ -248,6 +287,10 @@ function loadDrafts(page: number): void {
         }
     });
 }
+
+watch(pageSize, () => {
+    loadDrafts(1);
+});
 
 function openTransactionEditDialog(draft: TransactionDraftInfoResponse): void {
     transactionEditDialog.value?.open({

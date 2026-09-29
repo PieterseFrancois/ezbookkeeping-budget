@@ -1,57 +1,88 @@
 <template>
-    <v-row class="match-height">
-        <!-- Header -->
-        <v-col cols="12" class="d-flex align-center pb-2">
-            <h5 class="text-h5">{{ tt('Budget') }}</h5>
-            <v-btn
-                variant="text"
-                density="comfortable"
-                class="ms-2"
-                @click="showHelpDialog = true"
-            >
-                <v-icon :icon="mdiHelpCircleOutline" size="22" />
-                <v-tooltip activator="parent">{{ tt('How Budgeting Works') }}</v-tooltip>
-            </v-btn>
-            <v-spacer />
-            <v-btn
-                class="me-2 px-2"
-                min-width="0"
-                variant="tonal"
-                @click="showAmountInBudgetPage = !showAmountInBudgetPage"
-            >
-                <v-icon :icon="showAmountInBudgetPage ? mdiEyeOffOutline : mdiEyeOutline" size="20" />
-                <v-tooltip activator="parent">{{ showAmountInBudgetPage ? tt('Hide Amount') : tt('Show Amount') }}</v-tooltip>
-            </v-btn>
-            <v-btn :prepend-icon="mdiContentCopy" variant="tonal" @click="openCopyDialog">
-                {{ tt('Copy Budget') }}
-            </v-btn>
-        </v-col>
-
-        <!-- Timeline strip -->
-        <v-col cols="12" class="py-0">
-            <div class="budget-timeline-wrap">
-                <div class="budget-timeline">
-                    <span
-                        v-for="m in timelineMonths"
-                        :key="`${m.year}-${m.month}`"
-                        :ref="(el) => setChipRef(m, el)"
-                        class="budget-timeline-chip"
-                        :class="{ 'budget-timeline-chip--active': isSelectedMonth(m) }"
-                        @click="onTimelineClick(m)"
-                    >{{ formatTimelineLabel(m) }}</span>
+    <main-page-layout nav-items-class="budget-nav-items">
+        <template #nav-items>
+            <div class="budget-custom-month my-2">
+                <span class="mx-3 text-body-medium">{{ tt('Custom Month') }}</span>
+                <div class="mt-1 mx-3">
+                    <v-select
+                        item-title="label"
+                        item-value="value"
+                        density="compact"
+                        hide-details
+                        :disabled="loading"
+                        :items="copyMonthOptions"
+                        v-model="customMonth"
+                    />
                 </div>
+                <div class="mt-2 mx-3">
+                    <v-text-field
+                        type="number"
+                        density="compact"
+                        hide-details
+                        :disabled="loading"
+                        v-model.number="customYear"
+                    />
+                </div>
+                <v-btn class="mt-2 mx-3" density="compact" variant="tonal" :disabled="loading" @click="goToCustomMonth">
+                    {{ tt('Go') }}
+                </v-btn>
+                <v-divider class="mt-2" />
             </div>
-        </v-col>
+            <template v-for="group in timelineMonthsByYear" :key="group.year">
+                <li class="nav-section-title">
+                    <div class="title-wrapper">
+                        <span class="title-text">{{ group.year }}</span>
+                    </div>
+                </li>
+                <li class="nav-link" :key="`${m.year}-${m.month}`" v-for="m in group.months">
+                    <a class="d-flex align-center cursor-pointer my-1"
+                       :ref="(el) => setChipRef(m, el)"
+                       :class="{ 'router-link-active router-link-exact-active': isSelectedMonth(m), 'disabled': loading }"
+                       @click="onTimelineClick(m)">
+                        <span class="nav-item-title text-truncate">{{ formatTimelineLabel(m) }}</span>
+                    </a>
+                </li>
+            </template>
+        </template>
 
-        <!-- Budget cycle note -->
-        <v-col cols="12" class="pb-0 pt-1" v-if="budgetCycleNote">
-            <span class="text-caption text-medium-emphasis">{{ budgetCycleNote }}</span>
-        </v-col>
+        <template #content>
+            <v-card>
+                <template #title>
+                    <div class="title-and-toolbar d-flex align-center text-no-wrap">
+                        <span>{{ tt('Budget') }}</span>
+                        <v-btn
+                            variant="text"
+                            density="comfortable"
+                            class="ms-2"
+                            @click="showHelpDialog = true"
+                        >
+                            <v-icon :icon="mdiHelpCircleOutline" size="22" />
+                            <v-tooltip activator="parent">{{ tt('How Budgeting Works') }}</v-tooltip>
+                        </v-btn>
+                        <v-spacer />
+                        <v-btn
+                            class="me-2 px-2"
+                            min-width="0"
+                            variant="tonal"
+                            @click="showAmountInBudgetPage = !showAmountInBudgetPage"
+                        >
+                            <v-icon :icon="showAmountInBudgetPage ? mdiEyeOffOutline : mdiEyeOutline" size="20" />
+                            <v-tooltip activator="parent">{{ showAmountInBudgetPage ? tt('Hide Amount') : tt('Show Amount') }}</v-tooltip>
+                        </v-btn>
+                        <v-btn :prepend-icon="mdiContentCopy" variant="tonal" @click="openCopyDialog">
+                            {{ tt('Copy Budget') }}
+                        </v-btn>
+                    </div>
+                </template>
 
-        <!-- Budget table -->
-        <v-col cols="12" class="pt-3">
-            <div class="budget-table-wrap">
-                <div class="budget-table">
+                <!-- Budget cycle note -->
+                <v-card-text class="pt-0" v-if="budgetCycleNote">
+                    <span class="text-caption text-medium-emphasis">{{ budgetCycleNote }}</span>
+                </v-card-text>
+
+                <!-- Budget table -->
+                <div class="budget-table-wrap">
+                    <div class="budget-table">
 
                     <!-- ── Row 1: month title headers ── -->
                     <div class="budget-name-col budget-th budget-th-corner"></div>
@@ -587,8 +618,7 @@
 
                 </div>
             </div>
-        </v-col>
-    </v-row>
+            </v-card>
 
     <!-- Cards & Debt reserve panel -->
     <v-row v-if="!loading && liabilityReserves.length > 0">
@@ -611,6 +641,8 @@
             </v-card>
         </v-col>
     </v-row>
+        </template>
+    </main-page-layout>
 
     <!-- Help Dialog -->
     <budget-help-dialog v-model="showHelpDialog" />
@@ -919,6 +951,27 @@ function setChipRef(m: { year: number; month: number }, el: unknown): void {
     if (el) chipRefs.set(`${m.year}-${m.month}`, el as Element);
 }
 
+// ---------- Custom month entry ----------
+
+const customMonth = ref<number>(selectedMonth.value);
+const customYear = ref<number>(selectedYear.value);
+
+watch([selectedYear, selectedMonth], () => {
+    customYear.value = selectedYear.value;
+    customMonth.value = selectedMonth.value;
+});
+
+function goToCustomMonth(): void {
+    const month = customMonth.value;
+    const year = customYear.value;
+
+    if (!Number.isFinite(year) || month < 1 || month > 12) {
+        return;
+    }
+
+    selectMonth(year, month);
+}
+
 // ---------- Computed: categories ----------
 
 const allExpenseParents = computed<TransactionCategory[]>(() =>
@@ -1024,10 +1077,26 @@ const nowMonth = nowDate.getMonth() + 1;
 
 const timelineMonths = computed<{ year: number; month: number }[]>(() => {
     const months: { year: number; month: number }[] = [];
-    for (let delta = -24; delta <= 12; delta++) {
+    for (let delta = -12; delta <= 12; delta++) {
         months.push(addMonths(nowYear, nowMonth, delta));
     }
     return months;
+});
+
+const timelineMonthsByYear = computed<{ year: number; months: { year: number; month: number }[] }[]>(() => {
+    const groups: { year: number; months: { year: number; month: number }[] }[] = [];
+
+    for (const m of timelineMonths.value) {
+        const lastGroup = groups[groups.length - 1];
+
+        if (lastGroup && lastGroup.year === m.year) {
+            lastGroup.months.push(m);
+        } else {
+            groups.push({ year: m.year, months: [m] });
+        }
+    }
+
+    return groups;
 });
 
 const copyYearOptions = computed<number[]>(() => {
@@ -1499,7 +1568,7 @@ async function loadLiabilityReserves(year: number, month: number): Promise<void>
 function scrollToSelected(): void {
     nextTick(() => {
         const el = chipRefs.get(`${selectedYear.value}-${selectedMonth.value}`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 }
 
@@ -1655,44 +1724,24 @@ if (isUserLogined() && isUserUnlocked()) {
 </script>
 
 <style>
-/* ── Timeline ── */
-.budget-timeline-wrap {
-    overflow-x: auto;
-    width: 100%;
-    scrollbar-width: thin;
+/* ── Custom month (sticky at top of sidebar) ── */
+/* .nav-items' own top padding scrolls away with the list (only end-edge padding
+   stays reachable), which would let a scrolled-past item peek out above a sticky
+   child positioned at top:0. Budget's sidebar drops that top padding entirely
+   (via the nav-items-class override below) and this element re-adds the same
+   spacing as its own padding, so it can sit flush at the scrollport's true top
+   with an opaque background covering everything that scrolls beneath it. */
+.budget-custom-month {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding-block-start: var(--ebk-space-2);
+    padding-block-end: var(--ebk-space-2);
+    background: rgb(var(--ebk-surface));
 }
 
-.budget-timeline {
-    display: flex;
-    gap: 8px;
-    padding: 6px 2px;
-    white-space: nowrap;
-}
-
-.budget-timeline-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 12px;
-    border-radius: 16px;
-    font-size: 0.8125rem;
-    cursor: pointer;
-    background-color: rgba(var(--v-theme-on-surface), 0.06);
-    transition: background-color 0.15s;
-    user-select: none;
-    flex-shrink: 0;
-}
-
-.budget-timeline-chip:hover {
-    background-color: rgba(var(--v-theme-on-surface), 0.14);
-}
-
-.budget-timeline-chip--active {
-    background-color: rgb(var(--v-theme-primary));
-    color: rgb(var(--v-theme-on-primary));
-}
-
-.budget-timeline-chip--active:hover {
-    filter: brightness(0.92);
+.budget-nav-items {
+    padding-block-start: 0 !important;
 }
 
 /* ── Outer scroll wrapper ── */

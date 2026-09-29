@@ -50,12 +50,23 @@
                                            :aria-label="tt('Transaction Details')" :icon="true"
                                            :active="isTopNavigationActive('/transaction/list')"
                                            :color="isTopNavigationActive('/transaction/list') ? 'primary' : 'default'">
+                                        <v-icon :icon="isTopNavigationActive('/transaction/list') ? mdiListBox : mdiListBoxOutline" size="24" />
+                                        <v-tooltip activator="parent">{{ tt('Transaction Details') }}</v-tooltip>
+                                    </v-btn>
+                                </router-link>
+
+                                <router-link to="/transaction/drafts"
+                                             :aria-current="isTopNavigationActive('/transaction/drafts') ? 'page' : undefined">
+                                    <v-btn class="top-navigation-button ms-1" density="comfortable" variant="text"
+                                           :aria-label="tt('Drafts')" :icon="true"
+                                           :active="isTopNavigationActive('/transaction/drafts')"
+                                           :color="isTopNavigationActive('/transaction/drafts') ? 'primary' : 'default'">
                                         <v-badge :content="formatNumberToLocalizedNumerals(transactionDraftsStore.draftCount)"
                                                  color="warning" offset-x="2" offset-y="2"
                                                  :model-value="transactionDraftsStore.draftCount > 0">
-                                            <v-icon :icon="isTopNavigationActive('/transaction/list') ? mdiListBox : mdiListBoxOutline" size="24" />
+                                            <v-icon :icon="isTopNavigationActive('/transaction/drafts') ? mdiTrayFull : mdiTray" size="24" />
                                         </v-badge>
-                                        <v-tooltip activator="parent">{{ tt('Transaction Details') }}</v-tooltip>
+                                        <v-tooltip activator="parent">{{ tt('Drafts') }}</v-tooltip>
                                     </v-btn>
                                 </router-link>
 
@@ -253,6 +264,8 @@ import {
     mdiWalletOutline,
     mdiFlagCheckered,
     mdiCreditCardSync,
+    mdiTray,
+    mdiTrayFull,
     mdiPlus,
     mdiCellphone,
     mdiThemeLightDark,

@@ -6,8 +6,6 @@
 
         <overview-dashboard :layout="layout" :loading="loading" @navigate="onNavigate" />
 
-        <budget-overview-card :loading="loadingBudget" :budget-summary="budgetSummary" :unbudgeted="unbudgeted" :cycle-note="budgetCycleNote" />
-
         <f7-toolbar tabbar icons bottom class="main-tabbar">
             <f7-link class="link" href="/transaction/list" style="position: relative;" :aria-label="tt('Details')">
                 <f7-icon f7="square_list" aria-hidden="true"></f7-icon>
@@ -102,12 +100,10 @@
 
 <script setup lang="ts">
 import AIImageRecognitionSheet, { type AIImageRecognitionResult } from '@/components/mobile/AIImageRecognitionSheet.vue';
-import BudgetOverviewCard, { type BudgetSummaryItem, type UnbudgetedItem } from '@/views/mobile/budget/BudgetOverviewCard.vue';
 import OverviewDashboard from './overview/OverviewDashboard.vue';
 
 import { ref, computed, useTemplateRef } from 'vue';
 import type { Router } from 'framework7/types';
-import axios from 'axios';
 
 import { useI18n } from '@/locales/helpers.ts';
 import { useI18nUIComponents, isiOS } from '@/lib/ui/mobile.ts';
@@ -117,10 +113,8 @@ import { useAccountsStore } from '@/stores/account.ts';
 import { useTransactionCategoriesStore } from '@/stores/transactionCategory.ts';
 import { useTransactionTemplatesStore } from '@/stores/transactionTemplate.ts';
 import { useOverviewStore } from '@/stores/overview.ts';
-import { useUserStore } from '@/stores/user.ts';
 import { useTransactionDraftsStore } from '@/stores/transactionDraft.ts';
 
-import { CategoryType } from '@/core/category.ts';
 import {
     type MobileOverviewLayout,
     OverviewWidgetDataRequirement,
@@ -130,7 +124,6 @@ import { TemplateType } from '@/core/template.ts';
 import { MOBILE_OVERVIEW_WIDGET_DEFINITIONS, DEFAULT_MOBILE_OVERVIEW_LAYOUT } from '@/consts/overview_layout.ts';
 
 import { TransactionTemplate } from '@/models/transaction_template.ts';
-import type { ApiResponse } from '@/core/api.ts';
 
 import { isFunction } from '@/lib/common.ts';
 import {
@@ -144,8 +137,6 @@ import {
 } from '@/lib/overview_layout.ts';
 import { isUserLogined, isUserUnlocked } from '@/lib/userstate.ts';
 import { getShareCacheImageBlob } from '@/lib/cache.ts';
-import { getThisMonthFirstUnixTime, getThisMonthLastUnixTime } from '@/lib/datetime.ts';
-import { addMonths } from '@/views/base/BudgetPageBase.ts';
 import {
     isTransactionFromAITextRecognitionEnabled,
     isTransactionFromAIImageRecognitionEnabled
@@ -166,152 +157,14 @@ const accountsStore = useAccountsStore();
 const transactionCategoriesStore = useTransactionCategoriesStore();
 const transactionTemplatesStore = useTransactionTemplatesStore();
 const overviewStore = useOverviewStore();
-const userStore = useUserStore();
 const transactionDraftsStore = useTransactionDraftsStore();
 
 const aiImageRecognitionSheet = useTemplateRef<AIImageRecognitionSheetType>('aiImageRecognitionSheet');
 
 const loading = ref<boolean>(true);
-const loadingBudget = ref<boolean>(true);
 const showTransactionTemplatePopover = ref<boolean>(false);
 const showFinancialControlPopover = ref<boolean>(false);
 const showAIReceiptImageRecognitionSheet = ref<boolean>(false);
-
-const budgetSummary = ref<BudgetSummaryItem[]>([]);
-const unbudgeted = ref<UnbudgetedItem[]>([]);
-const cycleYear = ref<number>(new Date().getFullYear());
-const cycleMonth = ref<number>(new Date().getMonth() + 1);
-
-const budgetCycleNote = computed<string>(() => {
-    const endDay = userStore.currentUserBudgetEndDay;
-    if (!endDay) return '';
-    const { month: prevMonth } = addMonths(cycleYear.value, cycleMonth.value, -1);
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `Budget cycle: ${endDay + 1} ${monthNames[prevMonth - 1]} – ${endDay} ${monthNames[cycleMonth.value - 1]}`;
-});
-
-interface BudgetTargetRawItem {
-    id: string;
-    categoryId: string;
-    year: number;
-    month: number;
-    amount: string;
-}
-
-interface BudgetActualRawItem {
-    categoryId: string;
-    section: string;
-    amount: number;
-}
-
-async function loadBudgetOverview(): Promise<void> {
-    const now = new Date();
-    const calYear = now.getFullYear();
-    const calMonth = now.getMonth() + 1;
-    const endDay = userStore.currentUserBudgetEndDay;
-    let year: number;
-    let month: number;
-    let startTime: number;
-    let endTime: number;
-
-    if (!endDay) {
-        year = calYear;
-        month = calMonth;
-        startTime = getThisMonthFirstUnixTime();
-        endTime = getThisMonthLastUnixTime();
-    } else {
-        // If today has passed endDay, we're already in the next cycle
-        const resolved = now.getDate() > endDay ? addMonths(calYear, calMonth, 1) : { year: calYear, month: calMonth };
-        year = resolved.year;
-        month = resolved.month;
-        const { year: prevYear, month: prevMonth } = addMonths(year, month, -1);
-        startTime = Math.floor(new Date(prevYear, prevMonth - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000);
-        endTime = Math.floor(new Date(year, month - 1, endDay + 1, 0, 0, 0, 0).getTime() / 1000) - 1;
-    }
-
-    cycleYear.value = year;
-    cycleMonth.value = month;
-
-    const [budgetResp, actualsResp] = await Promise.all([
-        axios.get<ApiResponse<BudgetTargetRawItem[]>>(`v1/budget/targets.json?year=${year}&month=${month}`),
-        axios.get<ApiResponse<{ items: BudgetActualRawItem[] }>>('v1/budget/actuals.json', { params: { startTime, endTime } })
-    ]);
-
-    const targets = budgetResp.data?.result ?? [];
-    const actualItems = actualsResp.data?.result?.items ?? [];
-
-    // Per-category amounts split by section (the backend already excludes budget-excluded transactions)
-    const sectionByCat: Record<string, Partial<Record<string, number>>> = {};
-    for (const item of actualItems) {
-        const entry = sectionByCat[item.categoryId] ?? (sectionByCat[item.categoryId] = {});
-        entry[item.section] = (entry[item.section] ?? 0) + item.amount;
-    }
-
-    const spentBySubcategoryId: Record<string, number> = {};
-    const savingsNetBySubId: Record<string, number> = {};
-    for (const [catId, sections] of Object.entries(sectionByCat)) {
-        if (sections['expense']) {
-            spentBySubcategoryId[catId] = sections['expense'];
-        }
-        // Gross set-aside: savings contributions plus card/debt paydowns. Withdrawals are not
-        // netted off — they are income, and the overview card tracks progress toward targets.
-        const setAside = (sections['savings'] ?? 0) + (sections['debt'] ?? 0);
-        if (setAside !== 0) {
-            savingsNetBySubId[catId] = setAside;
-        }
-    }
-
-    const budgetedSubcategoryIds = new Set<string>();
-    for (const target of targets) {
-        budgetedSubcategoryIds.add(target.categoryId);
-    }
-
-    const parentGroups: Record<string, { name: string; icon: string; color: string; isSavings: boolean; totalBudgeted: number; totalSpent: number }> = {};
-    for (const target of targets) {
-        const subCat = transactionCategoriesStore.allTransactionCategoriesMap[target.categoryId];
-        if (!subCat || !subCat.parentId || subCat.parentId === '0') continue;
-
-        const parentId = subCat.parentId;
-        const parentCat = transactionCategoriesStore.allTransactionCategoriesMap[parentId];
-        if (!parentCat) continue;
-
-        const group = parentGroups[parentId] ?? (parentGroups[parentId] = { name: parentCat.name, icon: parentCat.icon, color: parentCat.color, isSavings: parentCat.type === CategoryType.Transfer, totalBudgeted: 0, totalSpent: 0 });
-        group.totalBudgeted += Number(target.amount);
-    }
-
-    for (const [parentId, group] of Object.entries(parentGroups)) {
-        const parentCat = transactionCategoriesStore.allTransactionCategoriesMap[parentId];
-        const isTransfer = parentCat?.type === CategoryType.Transfer;
-        for (const subCat of parentCat?.subCategories ?? []) {
-            group.totalSpent += isTransfer
-                ? (savingsNetBySubId[subCat.id] ?? 0)
-                : (spentBySubcategoryId[subCat.id] ?? 0);
-        }
-    }
-
-    budgetSummary.value = Object.values(parentGroups).map(g => ({
-        categoryName: g.name,
-        icon: g.icon,
-        color: g.color,
-        budgeted: g.totalBudgeted,
-        spent: g.totalSpent,
-        remaining: g.totalBudgeted - g.totalSpent,
-        isSavings: g.isSavings,
-    }));
-
-    const unbudgetedList: UnbudgetedItem[] = [];
-    for (const [subcatId, spent] of Object.entries(spentBySubcategoryId)) {
-        if (spent <= 0 || budgetedSubcategoryIds.has(subcatId)) continue;
-        const subCat = transactionCategoriesStore.allTransactionCategoriesMap[subcatId];
-        if (!subCat) continue;
-        const parentCat = subCat.parentId && subCat.parentId !== '0'
-            ? transactionCategoriesStore.allTransactionCategoriesMap[subCat.parentId]
-            : undefined;
-        const iconSource = parentCat ?? subCat;
-        unbudgetedList.push({ categoryName: parentCat ? `${parentCat.name} > ${subCat.name}` : subCat.name, icon: iconSource.icon, color: iconSource.color, spent });
-    }
-    unbudgeted.value = unbudgetedList;
-}
 
 const layout = computed<MobileOverviewLayout>(() => {
     try {
@@ -342,7 +195,7 @@ function init(): void {
         const promises: Promise<unknown>[] = [
             getShareCacheImageBlob(),
             accountsStore.loadAllAccounts({ force: false }),
-            transactionCategoriesStore.loadAllCategories({ force: false }).then(() => loadBudgetOverview().finally(() => { loadingBudget.value = false; })),
+            transactionCategoriesStore.loadAllCategories({ force: false }),
             transactionTemplatesStore.loadAllTemplates({ templateType: TemplateType.Normal.type,  force: false }),
             transactionDraftsStore.refreshDraftCount(),
             ...reloadOverviewData(false)

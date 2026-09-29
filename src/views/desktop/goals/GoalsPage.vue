@@ -1,23 +1,60 @@
 <template>
-    <v-row class="match-height">
-        <!-- Header -->
-        <v-col cols="12" class="d-flex align-center pb-2">
-            <h5 class="text-h5">{{ tt('Goals') }}</h5>
-            <v-spacer />
-            <v-btn
-                class="me-2 px-2"
-                min-width="0"
-                variant="tonal"
-                @click="showAmountInGoalsPage = !showAmountInGoalsPage"
-            >
-                <v-icon :icon="showAmountInGoalsPage ? mdiEyeOffOutline : mdiEyeOutline" size="20" />
-                <v-tooltip activator="parent">{{ showAmountInGoalsPage ? tt('Hide Amount') : tt('Show Amount') }}</v-tooltip>
-            </v-btn>
-            <v-btn :prepend-icon="mdiPlus" variant="tonal" @click="openAddDialog">
-                {{ tt('Add Goal') }}
-            </v-btn>
-        </v-col>
+    <main-page-layout>
+        <template #nav-items>
+            <div class="my-2">
+                <span class="mx-3 text-body-medium">{{ tt('Status') }}</span>
+                <v-select
+                    item-title="displayName"
+                    item-value="value"
+                    class="mt-1"
+                    density="compact"
+                    :disabled="loading"
+                    :items="[
+                        { displayName: tt('All'), value: 0 },
+                        { displayName: tt('In Progress'), value: 1 },
+                        { displayName: tt('Goal Reached'), value: 2 },
+                        { displayName: tt('Overdue'), value: 3 }
+                    ]"
+                    v-model="queryStatus"
+                />
+            </div>
+            <div class="my-2">
+                <span class="mx-3 text-body-medium">{{ tt('Account') }}</span>
+                <v-select
+                    item-title="name"
+                    item-value="id"
+                    class="mt-1"
+                    density="compact"
+                    :disabled="loading"
+                    :items="[{ id: '', name: tt('All Accounts') }, ...availableAccounts]"
+                    v-model="queryAccountId"
+                />
+            </div>
+        </template>
 
+        <template #content>
+            <v-card min-height="920">
+                <template #title>
+                    <div class="title-and-toolbar d-flex align-center text-no-wrap">
+                        <span>{{ tt('Goals') }}</span>
+                        <v-spacer />
+                        <v-btn
+                            class="me-2 px-2"
+                            min-width="0"
+                            variant="tonal"
+                            @click="showAmountInGoalsPage = !showAmountInGoalsPage"
+                        >
+                            <v-icon :icon="showAmountInGoalsPage ? mdiEyeOffOutline : mdiEyeOutline" size="20" />
+                            <v-tooltip activator="parent">{{ showAmountInGoalsPage ? tt('Hide Amount') : tt('Show Amount') }}</v-tooltip>
+                        </v-btn>
+                        <v-btn :prepend-icon="mdiPlus" variant="tonal" @click="openAddDialog">
+                            {{ tt('Add Goal') }}
+                        </v-btn>
+                    </div>
+                </template>
+
+                <v-card-text>
+    <v-row class="match-height">
         <!-- Loading skeletons -->
         <template v-if="loading">
             <v-col v-for="i in 3" :key="i" cols="12" sm="6" lg="4">
@@ -26,13 +63,13 @@
         </template>
 
         <!-- Empty state -->
-        <v-col v-else-if="goals.length === 0" cols="12" class="d-flex justify-center py-10">
+        <v-col v-else-if="filteredGoals.length === 0" cols="12" class="d-flex justify-center py-10">
             <span class="text-body-2 text-medium-emphasis">{{ tt('No goals yet. Add your first goal to get started.') }}</span>
         </v-col>
 
         <!-- Goal cards -->
         <v-col
-            v-for="goal in goals"
+            v-for="goal in filteredGoals"
             v-else
             :key="goal.id"
             cols="12"
@@ -112,6 +149,10 @@
             </v-card>
         </v-col>
     </v-row>
+                </v-card-text>
+            </v-card>
+        </template>
+    </main-page-layout>
 
     <!-- Add / Edit Dialog -->
     <v-dialog v-model="showDialog" max-width="480" :persistent="saving">
@@ -254,6 +295,9 @@ const saving = ref<boolean>(false);
 const deleting = ref<boolean>(false);
 const goals = ref<Goal[]>([]);
 
+const queryStatus = ref<number>(0);
+const queryAccountId = ref<string>('');
+
 const showDialog = ref<boolean>(false);
 const showDeleteDialog = ref<boolean>(false);
 const editingGoal = ref<Goal | null>(null);
@@ -282,6 +326,20 @@ const form = ref<GoalForm>({
 const accountOptions = computed(() =>
     accountsStore.allPlainAccounts.map(a => ({ id: a.id, name: a.name }))
 );
+
+const availableAccounts = computed(() => {
+    const seen = new Set<string>();
+    const result: { id: string, name: string }[] = [];
+
+    for (const goal of goals.value) {
+        if (!seen.has(goal.accountId)) {
+            seen.add(goal.accountId);
+            result.push({ id: goal.accountId, name: accountName(goal.accountId) });
+        }
+    }
+
+    return result;
+});
 
 function accountName(accountId: string): string {
     return accountsStore.allPlainAccounts.find(a => a.id === accountId)?.name ?? accountId;
@@ -373,6 +431,26 @@ function monthsRemaining(goal: Goal): number {
 function isOverdue(goal: Goal): boolean {
     return !isGoalReached(goal) && monthsRemaining(goal) <= 0;
 }
+
+const filteredGoals = computed(() => goals.value.filter(goal => {
+    if (queryStatus.value === 1 && (isGoalReached(goal) || isOverdue(goal))) {
+        return false;
+    }
+
+    if (queryStatus.value === 2 && !isGoalReached(goal)) {
+        return false;
+    }
+
+    if (queryStatus.value === 3 && !isOverdue(goal)) {
+        return false;
+    }
+
+    if (queryAccountId.value && goal.accountId !== queryAccountId.value) {
+        return false;
+    }
+
+    return true;
+}));
 
 function suggestionLabel(goal: Goal): string {
     if (isGoalReached(goal)) return fmtAmount(0);
@@ -506,5 +584,8 @@ if (isUserLogined() && isUserUnlocked()) {
 <style scoped>
 .goal-card {
     border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+    background:
+        linear-gradient(180deg, rgba(var(--v-theme-primary), 0.045), transparent 13rem),
+        rgba(var(--ebk-surface), 0.97);
 }
 </style>
