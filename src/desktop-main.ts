@@ -109,6 +109,7 @@ import LanguageSelectButton from '@/components/desktop/LanguageSelectButton.vue'
 import CurrencySelect from '@/components/desktop/CurrencySelect.vue';
 import DateTimeSelect from '@/components/desktop/DateTimeSelect.vue';
 import DateSelect from '@/components/desktop/DateSelect.vue';
+import TimeSelect from '@/components/desktop/TimeSelect.vue';
 import FiscalYearStartSelect from '@/components/desktop/FiscalYearStartSelect.vue';
 import ColorSelect from '@/components/desktop/ColorSelect.vue';
 import IconSelect from '@/components/desktop/IconSelect.vue';
@@ -583,6 +584,7 @@ app.component('LanguageSelectButton', LanguageSelectButton);
 app.component('CurrencySelect', CurrencySelect);
 app.component('DateTimeSelect', DateTimeSelect);
 app.component('DateSelect', DateSelect);
+app.component('TimeSelect', TimeSelect);
 app.component('FiscalYearStartSelect', FiscalYearStartSelect);
 app.component('ColorSelect', ColorSelect);
 app.component('IconSelect', IconSelect);

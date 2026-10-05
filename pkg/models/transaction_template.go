@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -88,6 +89,7 @@ type TransactionTemplateCreateRequest struct {
 	ScheduledEndDate           *string                           `json:"scheduledEndDate" binding:"omitempty"`
 	ScheduledTimezoneUtcOffset *int16                            `json:"utcOffset" binding:"omitempty,min=-720,max=840"`
 	ScheduledCreateAsDraft     *bool                             `json:"scheduledCreateAsDraft" binding:"omitempty"`
+	ScheduledTimeOfDay         *string                           `json:"scheduledTimeOfDay" binding:"omitempty"`
 	ClientSessionId            string                            `json:"clientSessionId"`
 }
 
@@ -116,6 +118,7 @@ type TransactionTemplateModifyRequest struct {
 	ScheduledEndDate           *string                           `json:"scheduledEndDate" binding:"omitempty"`
 	ScheduledTimezoneUtcOffset *int16                            `json:"utcOffset" binding:"omitempty,min=-720,max=840"`
 	ScheduledCreateAsDraft     *bool                             `json:"scheduledCreateAsDraft" binding:"omitempty"`
+	ScheduledTimeOfDay         *string                           `json:"scheduledTimeOfDay" binding:"omitempty"`
 }
 
 // TransactionTemplateHideRequest represents all parameters of transaction template hiding request
@@ -150,6 +153,7 @@ type TransactionTemplateInfoResponse struct {
 	ScheduledEndDate       *string                           `json:"scheduledEndDate" binding:"omitempty"`
 	ScheduledAt            *int16                            `json:"scheduledAt,omitempty"`
 	ScheduledCreateAsDraft bool                              `json:"scheduledCreateAsDraft,omitempty"`
+	ScheduledTimeOfDay     *string                           `json:"scheduledTimeOfDay,omitempty"`
 	DisplayOrder           int32                             `json:"displayOrder"`
 	Hidden                 bool                              `json:"hidden"`
 }
@@ -188,6 +192,10 @@ func (t *TransactionTemplate) ToTransactionTemplateInfoResponse(serverUtcOffset 
 		response.ScheduledFrequency = &t.ScheduledFrequency
 		response.ScheduledAt = &t.ScheduledAt
 		response.ScheduledCreateAsDraft = t.ScheduledCreateAsDraft
+
+		localMinutes := ((int(t.ScheduledAt)+int(t.ScheduledTimezoneUtcOffset))%1440 + 1440) % 1440
+		timeOfDay := fmt.Sprintf("%02d:%02d", localMinutes/60, localMinutes%60)
+		response.ScheduledTimeOfDay = &timeOfDay
 
 		templateTimeZone := time.FixedZone("Template Timezone", int(t.ScheduledTimezoneUtcOffset)*60)
 

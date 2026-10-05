@@ -2,6 +2,7 @@ package api
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -288,9 +289,20 @@ func (a *TransactionTemplatesApi) TemplateModifyHandler(c *core.WebContext) (any
 	}
 
 	if template.TemplateType == models.TRANSACTION_TEMPLATE_TYPE_SCHEDULE {
+		scheduledHour, scheduledMinute := 0, 0
+
+		if templateModifyReq.ScheduledTimeOfDay != nil {
+			var parseErr error
+			scheduledHour, scheduledMinute, parseErr = parseScheduledTimeOfDay(*templateModifyReq.ScheduledTimeOfDay)
+
+			if parseErr != nil {
+				return nil, errs.Or(parseErr, errs.ErrScheduledTransactionFrequencyInvalid)
+			}
+		}
+
 		newTemplate.ScheduledFrequencyType = *templateModifyReq.ScheduledFrequencyType
 		newTemplate.ScheduledFrequency = a.getOrderedFrequencyValues(*templateModifyReq.ScheduledFrequency)
-		newTemplate.ScheduledAt = a.getUTCScheduledAt(*templateModifyReq.ScheduledTimezoneUtcOffset)
+		newTemplate.ScheduledAt = a.getUTCScheduledAt(*templateModifyReq.ScheduledTimezoneUtcOffset, scheduledHour, scheduledMinute)
 		newTemplate.ScheduledTimezoneUtcOffset = *templateModifyReq.ScheduledTimezoneUtcOffset
 
 		if templateModifyReq.ScheduledCreateAsDraft != nil {
@@ -504,9 +516,20 @@ func (a *TransactionTemplatesApi) createNewTemplateModel(uid int64, templateCrea
 	}
 
 	if templateCreateReq.TemplateType == models.TRANSACTION_TEMPLATE_TYPE_SCHEDULE {
+		scheduledHour, scheduledMinute := 0, 0
+
+		if templateCreateReq.ScheduledTimeOfDay != nil {
+			var err error
+			scheduledHour, scheduledMinute, err = parseScheduledTimeOfDay(*templateCreateReq.ScheduledTimeOfDay)
+
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		template.ScheduledFrequencyType = *templateCreateReq.ScheduledFrequencyType
 		template.ScheduledFrequency = a.getOrderedFrequencyValues(*templateCreateReq.ScheduledFrequency)
-		template.ScheduledAt = a.getUTCScheduledAt(*templateCreateReq.ScheduledTimezoneUtcOffset)
+		template.ScheduledAt = a.getUTCScheduledAt(*templateCreateReq.ScheduledTimezoneUtcOffset, scheduledHour, scheduledMinute)
 		template.ScheduledTimezoneUtcOffset = *templateCreateReq.ScheduledTimezoneUtcOffset
 
 		if templateCreateReq.ScheduledCreateAsDraft != nil {
@@ -543,14 +566,37 @@ func (a *TransactionTemplatesApi) createNewTemplateModel(uid int64, templateCrea
 	return template, nil
 }
 
-func (a *TransactionTemplatesApi) getUTCScheduledAt(scheduledTimezoneUtcOffset int16) int16 {
+func (a *TransactionTemplatesApi) getUTCScheduledAt(scheduledTimezoneUtcOffset int16, hour int, minute int) int16 {
 	templateTimeZone := time.FixedZone("Template Timezone", int(scheduledTimezoneUtcOffset)*60)
-	transactionTime := time.Date(2020, 1, 1, 0, 0, 0, 0, templateTimeZone)
+	transactionTime := time.Date(2020, 1, 1, hour, minute, 0, 0, templateTimeZone)
 	transactionTimeInUTC := transactionTime.In(time.UTC)
 
 	minutesElapsedOfDayInUtc := transactionTimeInUTC.Hour()*60 + transactionTimeInUTC.Minute()
 
 	return int16(minutesElapsedOfDayInUtc)
+}
+
+// parseScheduledTimeOfDay parses a "HH:mm" time-of-day string into its hour and minute components
+func parseScheduledTimeOfDay(value string) (hour int, minute int, err error) {
+	parts := strings.Split(value, ":")
+
+	if len(parts) != 2 {
+		return 0, 0, errs.ErrScheduledTransactionFrequencyInvalid
+	}
+
+	hour, err = strconv.Atoi(parts[0])
+
+	if err != nil || hour < 0 || hour > 23 {
+		return 0, 0, errs.ErrScheduledTransactionFrequencyInvalid
+	}
+
+	minute, err = strconv.Atoi(parts[1])
+
+	if err != nil || minute < 0 || minute > 59 {
+		return 0, 0, errs.ErrScheduledTransactionFrequencyInvalid
+	}
+
+	return hour, minute, nil
 }
 
 func (a *TransactionTemplatesApi) getOrderedFrequencyValues(frequencyValue string) string {

@@ -284,6 +284,24 @@
                                         v-model:type="transaction.scheduledFrequencyType"
                                         v-model="transaction.scheduledFrequency" />
                                 </v-col>
+                                <v-col cols="12" md="6" class="d-flex align-center" v-if="type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type">
+                                    <v-switch
+                                        inset
+                                        color="primary"
+                                        :label="tt('Create as Draft')"
+                                        :readonly="mode === TransactionEditPageMode.View"
+                                        :disabled="loading || submitting"
+                                        v-model="transaction.scheduledCreateAsDraft"
+                                        hide-details
+                                    />
+                                </v-col>
+                                <v-col cols="12" md="6" v-if="type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type">
+                                    <time-select
+                                        :readonly="mode === TransactionEditPageMode.View"
+                                        :disabled="loading || submitting"
+                                        :label="tt('Time of Day')"
+                                        v-model="transaction.scheduledTimeOfDay" />
+                                </v-col>
                                 <v-col cols="12" md="6" v-if="type === TransactionEditPageType.Transaction || (type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type)">
                                     <v-autocomplete
                                         class="transaction-edit-timezone"
@@ -318,16 +336,6 @@
                                         :label="tt('End Date')"
                                         :no-data-text="tt('No limit')"
                                         v-model="transaction.scheduledEndDate" />
-                                </v-col>
-                                <v-col cols="12" md="12" v-if="type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type">
-                                    <v-checkbox
-                                        :label="tt('Create as Draft')"
-                                        :readonly="mode === TransactionEditPageMode.View"
-                                        :disabled="loading || submitting"
-                                        v-model="transaction.scheduledCreateAsDraft"
-                                        density="compact"
-                                        hide-details
-                                    />
                                 </v-col>
                                 <v-col cols="12" md="12" v-if="type === TransactionEditPageType.Transaction">
                                     <v-select

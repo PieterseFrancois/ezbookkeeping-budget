@@ -282,6 +282,33 @@
             </f7-list-item>
 
             <f7-list-item
+                :title="tt('Create as Draft')"
+                v-if="pageTypeAndMode?.type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type"
+            >
+                <template #after>
+                    <f7-toggle
+                        :checked="(transaction as TransactionTemplate).scheduledCreateAsDraft"
+                        :disabled="mode === TransactionEditPageMode.View"
+                        @toggle:change="(val: boolean) => (transaction as TransactionTemplate).scheduledCreateAsDraft = val"
+                    />
+                </template>
+            </f7-list-item>
+
+            <f7-list-item
+                class="list-item-with-header-and-title"
+                link="#" no-chevron
+                :class="{ 'readonly': mode === TransactionEditPageMode.View }"
+                :header="tt('Time of Day')"
+                :title="transactionDisplayScheduledTimeOfDay"
+                @click="showScheduledTimeOfDaySheet = true"
+                v-if="pageTypeAndMode?.type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type"
+            >
+                <time-selection-sheet v-model:show="showScheduledTimeOfDaySheet"
+                                      v-model="(transaction as TransactionTemplate).scheduledTimeOfDay">
+                </time-selection-sheet>
+            </f7-list-item>
+
+            <f7-list-item
                 class="transaction-edit-datetime list-item-with-header-and-title"
                 link="#" no-chevron
                 :class="{ 'readonly': mode === TransactionEditPageMode.View }"
@@ -307,19 +334,6 @@
                 <date-selection-sheet v-model:show="showScheduledEndDateSheet"
                                       v-model="transaction.scheduledEndDate">
                 </date-selection-sheet>
-            </f7-list-item>
-
-            <f7-list-item
-                :title="tt('Create as Draft')"
-                v-if="pageTypeAndMode?.type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type"
-            >
-                <template #after>
-                    <f7-toggle
-                        :checked="(transaction as TransactionTemplate).scheduledCreateAsDraft"
-                        :disabled="mode === TransactionEditPageMode.View"
-                        @toggle:change="(val: boolean) => (transaction as TransactionTemplate).scheduledCreateAsDraft = val"
-                    />
-                </template>
             </f7-list-item>
 
             <f7-list-item
@@ -597,11 +611,15 @@ import { TransactionTemplate } from '@/models/transaction_template.ts';
 import type { TransactionPictureInfoBasicResponse } from '@/models/transaction_picture_info.ts';
 import { Transaction } from '@/models/transaction.ts';
 
+import { useDateTimeSelectionBase } from '@/components/base/DateTimeSelectionBase.ts';
+
 import { isDefined } from '@/lib/common.ts';
 import { parseBigDecimal } from '@/lib/numeral.ts';
 import {
     getTimezoneOffset,
     getTimezoneOffsetMinutes,
+    getHourIn12HourFormat,
+    getAMOrPM,
     parseDateTimeFromUnixTimeWithTimezoneOffset
 } from '@/lib/datetime.ts';
 import { formatCoordinate } from '@/lib/coordinate.ts';
@@ -639,6 +657,7 @@ const {
     parseAmountFromLocalizedNumerals
 } = useI18n();
 const { showAlert, showConfirm, showCancelableLoading, showToast, routeBackOnError } = useI18nUIComponents();
+const { is24Hour, getDisplayTimeValue } = useDateTimeSelectionBase();
 
 const {
     mode,
@@ -732,6 +751,7 @@ const showSourceAccountSheet = ref<boolean>(false);
 const showDestinationAccountSheet = ref<boolean>(false);
 const showTransactionDateTimeSheet = ref<boolean>(false);
 const showTransactionScheduledFrequencySheet = ref<boolean>(false);
+const showScheduledTimeOfDaySheet = ref<boolean>(false);
 const showScheduledStartDateSheet = ref<boolean>(false);
 const showScheduledEndDateSheet = ref<boolean>(false);
 const showGeoLocationMapSheet = ref<boolean>(false);
@@ -896,6 +916,25 @@ const transactionDisplayScheduledFrequency = computed<string>(() => {
     } else {
         return '';
     }
+});
+
+const transactionDisplayScheduledTimeOfDay = computed<string>(() => {
+    if (pageTypeAndMode?.type !== TransactionEditPageType.Template) {
+        return '';
+    }
+
+    const template = transaction.value as TransactionTemplate;
+    const parts = (template.scheduledTimeOfDay || '00:00').split(':');
+    const hour24 = parseInt(parts[0] ?? '0', 10) || 0;
+    const minute = parseInt(parts[1] ?? '0', 10) || 0;
+    const minuteText = getDisplayTimeValue(minute, true);
+
+    if (is24Hour.value) {
+        return `${getDisplayTimeValue(hour24, true)}:${minuteText}`;
+    }
+
+    const meridiemText = tt(`datetime.${getAMOrPM(hour24)}.content`);
+    return `${getDisplayTimeValue(getHourIn12HourFormat(hour24), false)}:${minuteText} ${meridiemText}`;
 });
 
 const transactionDisplayScheduledStartDate = computed<string>(() => {
