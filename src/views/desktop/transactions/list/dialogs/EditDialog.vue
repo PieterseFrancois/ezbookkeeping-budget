@@ -364,6 +364,22 @@
                                         v-model="transaction.comment"
                                     />
                                 </v-col>
+                                <v-col cols="12" md="12">
+                                    <v-expansion-panels variant="accordion" class="transaction-advanced-budgeting">
+                                        <v-expansion-panel :title="tt('Advanced Budgeting')">
+                                            <v-expansion-panel-text>
+                                                <v-checkbox
+                                                    :label="tt('Exclude from Budget')"
+                                                    :readonly="mode === TransactionEditPageMode.View"
+                                                    :disabled="loading || submitting"
+                                                    v-model="transaction.excludeFromBudget"
+                                                    density="compact"
+                                                    hide-details
+                                                />
+                                            </v-expansion-panel-text>
+                                        </v-expansion-panel>
+                                    </v-expansion-panels>
+                                </v-col>
                             </v-row>
                         </v-form>
                     </v-window-item>
@@ -1510,6 +1526,11 @@ defineExpose({
             min-height: 514px;
         }
     }
+}
+
+.transaction-advanced-budgeting {
+    outline: 1px solid rgba(var(--v-theme-on-surface), 0.12) !important;
+    border-radius: 4px;
 }
 
 .transaction-picture .picture-control-icon {
