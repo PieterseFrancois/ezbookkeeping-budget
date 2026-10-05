@@ -959,6 +959,43 @@ func (s *TransactionService) CreateScheduledTransactions(c core.Context, current
 			continue
 		}
 
+		if template.ScheduledCreateAsDraft {
+			draft := &models.TransactionDraft{
+				Uid:               template.Uid,
+				Type:              transactionDbType,
+				CategoryId:        template.CategoryId,
+				TransactionTime:   utils.GetMinTransactionTimeFromUnixTime(transactionTime.Unix()),
+				TimezoneUtcOffset: template.ScheduledTimezoneUtcOffset,
+				AccountId:         template.AccountId,
+				Amount:            template.Amount,
+				HideAmount:        template.HideAmount,
+				TagIds:            template.TagIds,
+				Comment:           template.Comment,
+				Source:            fmt.Sprintf("schedule:%d:%d", template.TemplateId, transactionUnixTime),
+				CreatedIp:         c.ClientIP(),
+			}
+
+			if template.Type == models.TRANSACTION_TYPE_TRANSFER {
+				draft.DestinationAccountId = template.RelatedAccountId
+				draft.DestinationAmount = template.RelatedAccountAmount
+			}
+
+			err = TransactionDrafts.CreateTransactionDraft(c, draft)
+
+			if err == nil {
+				successCount++
+				log.Infof(c, "[transactions.CreateScheduledTransactions] transaction template \"id:%d\" has created a new transaction draft \"id:%d\"", template.TemplateId, draft.TransactionDraftId)
+			} else if err == errs.ErrTransactionDraftSourceAlreadyExists {
+				skipCount++
+				log.Infof(c, "[transactions.CreateScheduledTransactions] transaction template \"id:%d\" already has a draft for this schedule slot", template.TemplateId)
+			} else {
+				failedCount++
+				log.Errorf(c, "[transactions.CreateScheduledTransactions] transaction template \"id:%d\" failed to create new transaction draft, because %s", template.TemplateId, err.Error())
+			}
+
+			continue
+		}
+
 		transaction := &models.Transaction{
 			Uid:               template.Uid,
 			Type:              transactionDbType,

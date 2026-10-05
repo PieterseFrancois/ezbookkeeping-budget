@@ -310,6 +310,19 @@
             </f7-list-item>
 
             <f7-list-item
+                :title="tt('Create as Draft')"
+                v-if="pageTypeAndMode?.type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type"
+            >
+                <template #after>
+                    <f7-toggle
+                        :checked="(transaction as TransactionTemplate).scheduledCreateAsDraft"
+                        :disabled="mode === TransactionEditPageMode.View"
+                        @toggle:change="(val: boolean) => (transaction as TransactionTemplate).scheduledCreateAsDraft = val"
+                    />
+                </template>
+            </f7-list-item>
+
+            <f7-list-item
                 :no-chevron="mode === TransactionEditPageMode.View"
                 link="#"
                 class="list-item-with-header-and-title list-item-title-hide-overflow list-item-no-item-after"

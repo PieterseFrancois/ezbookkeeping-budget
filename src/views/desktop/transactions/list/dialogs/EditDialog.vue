@@ -319,6 +319,16 @@
                                         :no-data-text="tt('No limit')"
                                         v-model="transaction.scheduledEndDate" />
                                 </v-col>
+                                <v-col cols="12" md="12" v-if="type === TransactionEditPageType.Template && transaction instanceof TransactionTemplate && transaction.templateType === TemplateType.Schedule.type">
+                                    <v-checkbox
+                                        :label="tt('Create as Draft')"
+                                        :readonly="mode === TransactionEditPageMode.View"
+                                        :disabled="loading || submitting"
+                                        v-model="transaction.scheduledCreateAsDraft"
+                                        density="compact"
+                                        hide-details
+                                    />
+                                </v-col>
                                 <v-col cols="12" md="12" v-if="type === TransactionEditPageType.Transaction">
                                     <v-select
                                         persistent-placeholder
