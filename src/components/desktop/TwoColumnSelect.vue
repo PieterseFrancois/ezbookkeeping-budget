@@ -34,9 +34,7 @@
                 <v-text-field eager ref="filterInput" density="compact"
                               :prepend-inner-icon="mdiMagnify"
                               :placeholder="filterPlaceholder"
-                              v-model="filterContent"
-                              @click:control="onInputFocused(filterInput, true)"
-                              @update:focused="onInputFocused(filterInput, $event)"></v-text-field>
+                              v-model="filterContent"></v-text-field>
             </div>
             <div class="text-body-large mx-4 mt-3 mb-2" v-show="!filteredItems || !filteredItems.length">
                 {{ filterNoItemsText }}
@@ -253,15 +251,15 @@ function onMenuStateChanged(state: boolean): void {
                 scrollToSelectedItem(dropdownMenu.value.parentElement, '.primary-list-container', '.primary-list-container', '.primary-list-item-selected');
                 scrollToSelectedItem(dropdownMenu.value.parentElement, '.secondary-list-container', '.secondary-list-container', '.secondary-list-item-selected');
             }
-        });
-    }
-}
 
-function onInputFocused(input: VTextField | null | undefined, focused: boolean): void {
-    if (input && focused) {
-        nextTick(() => {
-            setChildInputFocus(input?.$el, 'input');
-            updateMenuPosition();
+            if (props.enableFilter) {
+                // the menu content is created when the menu opens for the first time, so the filter field may not exist yet on this tick
+                setTimeout(() => {
+                    if (menuState.value && filterInput.value) {
+                        setChildInputFocus(filterInput.value.$el, 'input');
+                    }
+                }, 50);
+            }
         });
     }
 }

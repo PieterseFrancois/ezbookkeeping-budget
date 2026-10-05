@@ -83,6 +83,8 @@ import type {
     TransactionInfoPageWrapperResponse2,
     TransactionReconciliationStatementRequest,
     TransactionReconciliationStatementResponse,
+    TransactionUnreconciledCountRequest,
+    TransactionUnreconciledCountResponse,
     TransactionStatisticRequest,
     TransactionStatisticResponse,
     TransactionStatisticTrendsRequest,
@@ -559,6 +561,9 @@ export default {
     },
     getReconciliationStatements: (req: TransactionReconciliationStatementRequest): ApiResponsePromise<TransactionReconciliationStatementResponse> => {
         return axios.get<ApiResponse<TransactionReconciliationStatementResponse>>(`v1/transactions/reconciliation_statements.json?account_id=${req.accountId}&start_time=${req.startTime}&end_time=${req.endTime}`);
+    },
+    getUnreconciledTransactionCounts: (req: TransactionUnreconciledCountRequest): ApiResponsePromise<TransactionUnreconciledCountResponse> => {
+        return axios.get<ApiResponse<TransactionUnreconciledCountResponse>>(`v1/transactions/unreconciled_transaction_counts.json?account_ids=${req.accountIds.join(',')}`);
     },
     getTransactionStatistics: (req: TransactionStatisticRequest): ApiResponsePromise<TransactionStatisticResponse> => {
         const queryParams: string[] = [];

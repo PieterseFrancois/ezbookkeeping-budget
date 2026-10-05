@@ -216,7 +216,7 @@
                         <span v-if="item.type === TransactionType.Transfer && item.sourceAccountId !== item.destinationAccountId && getDisplaySourceAmount(item) !== getDisplayDestinationAmount(item)">{{ getDisplayDestinationAmount(item) }}</span>
                         <v-tooltip activator="parent" v-if="!item.hideAmount && ((item.type !== TransactionType.Transfer && item.sourceAccount?.currency !== defaultCurrency) || (item.type === TransactionType.Transfer && item.sourceAccount?.currency !== defaultCurrency && item.destinationAccount?.currency !== defaultCurrency))">
                             <span>{{ getDisplaySourceAmount(item, true) }}</span>
-                            <v-icon class="ms-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer && item.sourceAccount?.id !== item.destinationAccount?.id && item.sourceAccount?.currency !== item.destinationAccount?.currency && item.sourceAmount !== item.destinationAmount"></v-icon>
+                            <v-icon class="icon-with-direction mx-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer && item.sourceAccount?.id !== item.destinationAccount?.id && item.sourceAccount?.currency !== item.destinationAccount?.currency && item.sourceAmount !== item.destinationAmount"></v-icon>
                             <span v-if="item.type === TransactionType.Transfer && item.sourceAccount?.id !== item.destinationAccount?.id && item.sourceAccount?.currency !== item.destinationAccount?.currency && item.sourceAmount !== item.destinationAmount">{{ getDisplayDestinationAmount(item, true) }}</span>
                         </v-tooltip>
                     </template>
@@ -383,6 +383,7 @@ type AmountInputDialogType = InstanceType<typeof AmountInputDialog>;
 type EditDialogType = InstanceType<typeof EditDialog>;
 
 const emit = defineEmits<{
+    (e: 'update:last-reconciled-time', newLastReconciledTime: number): void;
     (e: 'error', message: string): void;
 }>();
 
@@ -708,11 +709,13 @@ function updateLastReconciledTime(): void {
         return;
     }
 
+    const reconciledTime: number = newLastReconciledTime.value;
     updatingLastReconciledTime.value = true;
 
-    accountsStore.updateAccountLastReconciledTime(accountId.value, newLastReconciledTime.value).then(() => {
+    accountsStore.updateAccountLastReconciledTime(accountId.value, reconciledTime).then(() => {
         updatingLastReconciledTime.value = false;
         snackbar.value?.showMessage('Last reconciled time have been updated');
+        emit('update:last-reconciled-time', reconciledTime);
     }).catch(error => {
         updatingLastReconciledTime.value = false;
 

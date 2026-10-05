@@ -8,7 +8,7 @@
              :class="{ 'overview-dashboard-item-editing': editing, 'overview-dashboard-item-dragging': draggingWidget?.id === widget.id, 'overview-dashboard-item-fixed-height': isFixedHeightWidget(widget) }"
              :style="getWidgetStyle(widget)" :key="widget.id" v-for="widget in sortedWidgets">
             <overview-widget class="overview-dashboard-widget" :widget="widget" :loading="loading" :editing="editing"
-                             @refresh="$emit('refresh')" />
+                             @refresh="refresh" />
             <template v-if="editing">
                 <div class="overview-dashboard-title-drag-area" :aria-label="tt('Move')"
                      @pointerdown="startPointerAction($event, widget, 'move')"></div>
@@ -21,20 +21,20 @@
                             <v-list>
                                 <template v-if="DESKTOP_OVERVIEW_WIDGET_DEFINITIONS[widget.type]?.supportsSettings?.length">
                                     <v-list-item :prepend-icon="mdiCogOutline" :title="tt('Settings')"
-                                                 @click="$emit('configure', widget)" />
+                                                 @click="emit('configure', widget)" />
                                     <v-divider class="my-2" />
                                 </template>
                                 <v-list-item :prepend-icon="mdiContentDuplicate" :title="tt('Duplicate')"
-                                             @click="$emit('duplicate', widget)" />
+                                             @click="emit('duplicate', widget)" />
                                 <v-list-item :prepend-icon="mdiDeleteOutline" :title="tt('Delete')"
-                                             @click="$emit('remove', widget.id)" />
+                                             @click="emit('remove', widget.id)" />
                             </v-list>
                         </v-menu>
                     </v-btn>
                 </div>
                 <button class="overview-dashboard-resize-handle" :aria-label="tt('Resize')"
                         @pointerdown="startPointerAction($event, widget, 'resize')">
-                    <v-icon :icon="mdiResizeBottomRight" size="32" />
+                    <v-icon class="icon-with-direction" :icon="mdiResizeBottomRight" size="32" />
                 </button>
             </template>
         </div>
@@ -42,7 +42,7 @@
         <div class="d-flex flex-column align-center justify-center ga-3" v-if="!layout.widgets.length">
             <v-icon :icon="mdiWidgetsOutline" size="64" color="secondary" />
             <span class="text-title-medium">{{ tt('No widgets') }}</span>
-            <v-btn color="primary" variant="tonal" @click="$emit('add')" v-if="editing">{{ tt('Add Widget') }}</v-btn>
+            <v-btn color="primary" variant="tonal" @click="emit('add')" v-if="editing">{{ tt('Add Widget') }}</v-btn>
         </div>
     </div>
 </template>
@@ -112,7 +112,7 @@ const emit = defineEmits<{
     (e: 'configure', value: DesktopOverviewWidgetLayout): void;
     (e: 'duplicate', value: DesktopOverviewWidgetLayout): void;
     (e: 'remove', value: string): void;
-    (e: 'refresh'): void;
+    (e: 'refresh', force: boolean): void;
 }>();
 
 const { tt } = useI18n();
@@ -272,6 +272,10 @@ function finishPointerAction(event: PointerEvent): void {
     window.removeEventListener('pointercancel', finishPointerAction);
 
     emit('update:layout', { ...props.layout, widgets: compactDesktopOverviewWidgets(props.layout.widgets) });
+}
+
+function refresh(force: boolean): void {
+    emit('refresh', force);
 }
 
 onBeforeUnmount(() => {

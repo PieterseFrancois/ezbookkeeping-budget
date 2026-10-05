@@ -312,7 +312,7 @@
                                         :readonly="mode === TransactionEditPageMode.View"
                                         :disabled="loading || submitting || recognizing || (mode === TransactionEditPageMode.Edit && transaction.type === TransactionType.ModifyBalance)"
                                         :label="tt('Transaction Timezone')"
-                                        :placeholder="!transaction.timeZone && transaction.timeZone !== '' ? `(${transactionDisplayTimezone}) ${transactionTimezoneTimeDifference}` : tt('Timezone')"
+                                        :placeholder="!transaction.timeZone && transaction.timeZone !== '' ? `(${transactionDisplayTimezone}) ${type === TransactionEditPageType.Transaction ? transactionTimezoneTimeDifference : ''}` : tt('Timezone')"
                                         :items="allTimezones"
                                         :no-data-text="tt('No results')"
                                         :model-value="transaction.timeZone"
@@ -347,7 +347,7 @@
                                         v-model:menu="geoMenuState"
                                     >
                                         <template #selection>
-                                            <span class="cursor-pointer" v-if="transaction.geoLocation">{{ `(${formatCoordinate(transaction.geoLocation, coordinateDisplayType)})` }}</span>
+                                            <span class="cursor-pointer" v-if="transaction.geoLocation">{{ `(${formatCoordinate(transaction.geoLocation)})` }}</span>
                                             <span class="cursor-pointer" v-else-if="!transaction.geoLocation">{{ geoLocationStatusInfo }}</span>
                                         </template>
 
@@ -585,7 +585,6 @@ import {
     getTimezoneOffsetMinutes,
     getCurrentUnixTime
 } from '@/lib/datetime.ts';
-import { formatCoordinate } from '@/lib/coordinate.ts';
 import { generateRandomUUID } from '@/lib/misc.ts';
 import services from '@/lib/services.ts';
 import {
@@ -651,7 +650,7 @@ const props = defineProps<{
     show?: boolean;
 }>();
 
-const { tt } = useI18n();
+const { tt, formatCoordinate } = useI18n();
 
 const {
     mode,
@@ -669,7 +668,6 @@ const {
     setGeoLocationByClickMap,
     transaction,
     defaultCurrency,
-    coordinateDisplayType,
     imageUploadQualityType,
     allTimezones,
     allVisibleAccounts,

@@ -474,6 +474,22 @@ type TransactionReconciliationStatementResponse struct {
 	ClosingBalance string                                            `json:"closingBalance"`
 }
 
+// TransactionUnreconciledCountRequest represents the request for unreconciled transaction counts
+type TransactionUnreconciledCountRequest struct {
+	AccountIds string `form:"account_ids"`
+}
+
+// TransactionUnreconciledCountItem represents the unreconciled transaction count of an account
+type TransactionUnreconciledCountItem struct {
+	AccountId int64 `json:"accountId,string"`
+	Count     int64 `json:"count"`
+}
+
+// TransactionUnreconciledCountResponse represents the response of unreconciled transaction counts
+type TransactionUnreconciledCountResponse struct {
+	Items []*TransactionUnreconciledCountItem `json:"items"`
+}
+
 // TransactionStatisticResponse represents transaction statistic response
 type TransactionStatisticResponse struct {
 	StartTime int64                               `json:"startTime"`

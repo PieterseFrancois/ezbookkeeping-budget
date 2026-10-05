@@ -18,7 +18,8 @@ import {
 
 import {
     DEFAULT_MOBILE_OVERVIEW_WIDGET_DARK_BACKGROUND_COLOR,
-    DEFAULT_MOBILE_OVERVIEW_WIDGET_LIGHT_BACKGROUND_COLOR
+    DEFAULT_MOBILE_OVERVIEW_WIDGET_LIGHT_BACKGROUND_COLOR,
+    DEFAULT_MOBILE_ADD_TRANSACTION_BUTTON_BACKGROUND_COLOR
 } from '@/consts/color.ts';
 
 export const DESKTOP_OVERVIEW_LAYOUT_COLUMNS: number = 12;
@@ -125,6 +126,53 @@ export const DESKTOP_OVERVIEW_WIDGET_DEFINITIONS: PartialRecord<OverviewWidgetTy
         minHeight: 3,
         dataRequirements: [
             OverviewWidgetDataRequirement.Accounts
+        ]
+    },
+    [OverviewWidgetType.AccountUnreconciledTransactions]: {
+        type: OverviewWidgetType.AccountUnreconciledTransactions,
+        name: 'Account Unreconciled Transactions',
+        supportsSettings: [
+            WIDGET_TITLE_SETTING,
+            {
+                settingType: 'accountSelect',
+                settingName: 'accountIds',
+                displayName: 'Account',
+                disableHiddenAccounts: true
+            },
+            {
+                settingType: 'itemCountSelect',
+                settingName: 'itemCount',
+                displayName: 'Item Count',
+                itemCountValues: [3, 4, 5, 6, 7, 8, 9, 10]
+            },
+            {
+                settingType: 'customSelect',
+                settingName: 'sortBy',
+                displayName: 'Sort By',
+                selectValues: [
+                    {
+                        name: 'Display Order',
+                        value: 'displayOrder'
+                    },
+                    {
+                        name: 'Transaction Count',
+                        value: 'transactionCount'
+                    }
+                ]
+            }
+        ],
+        defaultSettings: {
+            accountIds: [],
+            itemCount: 4,
+            sortBy: 'displayOrder'
+        },
+        defaultWidth: 3,
+        defaultHeight: 3,
+        minWidth: 2,
+        minHeight: 3,
+        dataRequirements: [
+            OverviewWidgetDataRequirement.Accounts,
+            OverviewWidgetDataRequirement.AccountUnreconciledTransactionCounts
         ]
     },
     [OverviewWidgetType.CurrentMonthOverview]: {
@@ -820,6 +868,57 @@ export const MOBILE_OVERVIEW_WIDGET_DEFINITIONS: PartialRecord<OverviewWidgetTyp
             OverviewWidgetDataRequirement.Accounts
         ]
     },
+    [OverviewWidgetType.AccountUnreconciledTransactions]: {
+        type: OverviewWidgetType.AccountUnreconciledTransactions,
+        name: 'Account Unreconciled Transactions',
+        supportsSettings: [
+            WIDGET_TITLE_SETTING,
+            WIDGET_SHOW_TITLE_SETTING,
+            {
+                settingType: 'accountSelect',
+                settingName: 'accountIds',
+                displayName: 'Account',
+                disableHiddenAccounts: true
+            },
+            {
+                settingType: 'itemCountSelect',
+                settingName: 'itemCount',
+                displayName: 'Item Count',
+                itemCountValues: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+            },
+            {
+                settingType: 'customSelect',
+                settingName: 'sortBy',
+                displayName: 'Sort By',
+                selectValues: [
+                    {
+                        name: 'Display Order',
+                        value: 'displayOrder'
+                    },
+                    {
+                        name: 'Transaction Count',
+                        value: 'transactionCount'
+                    }
+                ]
+            },
+            {
+                settingType: 'switch',
+                settingName: 'hideWhenEmpty',
+                displayName: 'Hide when there are no accounts with unreconciled transactions'
+            }
+        ],
+        defaultSettings: {
+            showTitle: false,
+            accountIds: [],
+            itemCount: 4,
+            sortBy: 'displayOrder',
+            hideWhenEmpty: false
+        },
+        dataRequirements: [
+            OverviewWidgetDataRequirement.Accounts,
+            OverviewWidgetDataRequirement.AccountUnreconciledTransactionCounts
+        ]
+    },
     [OverviewWidgetType.CurrentMonthOverview]: {
         type: OverviewWidgetType.CurrentMonthOverview,
         name: 'This Month\'s Income and Expense Overview',
@@ -1101,8 +1200,13 @@ export const MOBILE_OVERVIEW_WIDGET_DEFINITIONS: PartialRecord<OverviewWidgetTyp
     [OverviewWidgetType.AddTransactionButton]: {
         type: OverviewWidgetType.AddTransactionButton,
         name: 'Add Transaction Button',
-        supportsSettings: [],
-        defaultSettings: {},
+        supportsSettings: [
+            ...WIDGET_BACKGROUND_COLOR_SETTINGS
+        ],
+        defaultSettings: {
+            lightBackgroundColor: DEFAULT_MOBILE_ADD_TRANSACTION_BUTTON_BACKGROUND_COLOR,
+            darkBackgroundColor: DEFAULT_MOBILE_ADD_TRANSACTION_BUTTON_BACKGROUND_COLOR
+        },
         dataRequirements: []
     }
 };

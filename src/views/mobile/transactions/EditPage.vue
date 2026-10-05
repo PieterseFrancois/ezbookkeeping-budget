@@ -349,7 +349,7 @@
                     <f7-block class="list-item-custom-title no-padding no-margin">
                         <span>{{ `(${transactionDisplayTimezone})` }}</span>
                         <span class="transaction-edit-timezone-name" v-if="transaction.timeZone || transaction.timeZone === ''">{{ transactionDisplayTimezoneName }}</span>
-                        <span class="transaction-edit-timezone-name" v-else-if="!transaction.timeZone && transaction.timeZone !== ''">{{ transactionTimezoneTimeDifference }}</span>
+                        <span class="transaction-edit-timezone-name" v-else-if="pageTypeAndMode?.type === TransactionEditPageType.Transaction && !transaction.timeZone && transaction.timeZone !== ''">{{ transactionTimezoneTimeDifference }}</span>
                     </f7-block>
                 </template>
                 <list-item-selection-popup value-type="item"
@@ -376,7 +376,7 @@
             >
                 <template #title>
                     <f7-block class="list-item-custom-title no-padding no-margin">
-                        <span v-if="transaction.geoLocation">{{ `(${formatCoordinate(transaction.geoLocation, coordinateDisplayType)})` }}</span>
+                        <span v-if="transaction.geoLocation">{{ `(${formatCoordinate(transaction.geoLocation)})` }}</span>
                         <span v-else-if="!transaction.geoLocation">{{ geoLocationStatusInfo }}</span>
                     </f7-block>
                 </template>
@@ -622,7 +622,6 @@ import {
     getAMOrPM,
     parseDateTimeFromUnixTimeWithTimezoneOffset
 } from '@/lib/datetime.ts';
-import { formatCoordinate } from '@/lib/coordinate.ts';
 import { generateRandomUUID } from '@/lib/misc.ts';
 import services from '@/lib/services.ts';
 import type { TransactionDraftCreateRequest, TransactionDraftModifyRequest, TransactionDraftConfirmRequest } from '@/models/transaction_draft.ts';
@@ -654,7 +653,8 @@ const {
     formatDateTimeToLongDate,
     formatDateTimeToLongTime,
     formatGregorianTextualYearMonthDayToLongDate,
-    parseAmountFromLocalizedNumerals
+    parseAmountFromLocalizedNumerals,
+    formatCoordinate
 } = useI18n();
 const { showAlert, showConfirm, showCancelableLoading, showToast, routeBackOnError } = useI18nUIComponents();
 const { is24Hour, getDisplayTimeValue } = useDateTimeSelectionBase();
@@ -678,7 +678,6 @@ const {
     currentTimezoneOffsetMinutes,
     defaultCurrency,
     firstDayOfWeek,
-    coordinateDisplayType,
     imageUploadQualityType,
     allTimezones,
     allVisibleAccounts,
